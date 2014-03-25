@@ -1,4 +1,5 @@
 #include "particle_array.h"
+#include <stdlib.h>
 
 int particle_array_create(particle_array *array) {
     array->size = 0;

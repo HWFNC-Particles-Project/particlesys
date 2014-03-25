@@ -1,4 +1,8 @@
 #include "effect_desc.h"
+#include <stdlib.h>
+#include <string.h>
+
+int effect_desc_add_element(effect_desc *ctx, effect_desc_ele *e);
 
 int effect_desc_init(effect_desc *ctx) {
     ctx->size = 0;
@@ -27,8 +31,8 @@ int effect_desc_reserve(effect_desc *ctx, size_t capacity) {
     }
     effect_desc_ele *new_ele = realloc(ctx->elements, capacity * sizeof(effect_desc_ele));
     if(new_ele != NULL) {
-        array->capacity = capacity;
-        array->elements = new_ele;
+        ctx->capacity = capacity;
+        ctx->elements = new_ele;
         return 0;
     } else {
         return 1;
@@ -37,7 +41,7 @@ int effect_desc_reserve(effect_desc *ctx, size_t capacity) {
 
 int effect_desc_add_element(effect_desc *ctx, effect_desc_ele *e) {
     if(ctx->size >= ctx->capacity) {
-        if(particle_array_reserve(ctx, ctx->capacity/2*3)) {
+        if(effect_desc_reserve(ctx, ctx->capacity/2*3)) {
             return -1;
         }
     }

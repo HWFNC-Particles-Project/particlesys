@@ -1,8 +1,9 @@
-#ifndef PARTICLE_EFFECTS_H
-#define PARTICLE_EFFECTS_H
+#ifndef __effect_program_naive_H
+#define __effect_program_naive_H
 
-#include <particle_array.h>
+#include "effect_program.h"
+#include "particle_array.h"
 
 int effect_program_create_naive(effect_program *p);
 
-#endif
+#endif  // __effect_program_naive_H

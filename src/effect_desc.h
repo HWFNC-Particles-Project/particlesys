@@ -2,6 +2,7 @@
 #define __effect_desc_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef enum effect_type_t {
     EFFECT_TYPE_LINEAR_ACCEL,   ///< Linear acceleration effect

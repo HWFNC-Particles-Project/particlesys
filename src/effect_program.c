@@ -10,7 +10,7 @@ void effect_program_execute(const effect_program *p, particle_array *arr, float 
 }
 
 
-void effect_program_destroy(const effect_program *p) {
+void effect_program_destroy(effect_program *p) {
     if (p->destroy) p->destroy(p);
 }
 

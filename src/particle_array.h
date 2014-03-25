@@ -1,7 +1,8 @@
 #ifndef PARTICLE_ARRAY_H
 #define PARTICLE_ARRAY_H
 
-#include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
 
 /* 
  * the particle type consisting of position, velocity, mass and charge.
@@ -25,12 +26,6 @@ typedef struct particle_array_t {
     size_t size, capacity;
     particle *particles;
 } particle_array;
-
-/*
- * frees a zero terminated effect array by calling free on all
- * the userdata pointers
- */ 
-void particle_effect_free(particle_effect *effects);
 
 /*
  * create an empty particle array. returns 0 on success

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <particle_array.h>
-#include <particle_effects.h>
+#include "particle_array.h"
+#include "effect_program_naive.h"
 
 int main(int argc, char *argv[]) {
     (void) argc; (void) argv;

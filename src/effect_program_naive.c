@@ -1,23 +1,7 @@
-#include <math.h>
 #include "effect_program_naive.h"
-
-void effect_program_naive_compile(effect_program *self, effect_desc *desc);
-void effect_program_naive_execute(effect_program *self, particle_array *arr);
-void effect_program_naive_destroy(effect_program *self);
-
-particle_effect linear_accel_effect(float x, float y, float z);
-particle_effect linear_force_effect(float x, float y, float z);
-particle_effect gravitational_force_effect(float x, float y, float z, float mu);
-particle_effect plane_bounce_effect(float x, float y, float z, float d);
-particle_effect sphere_bounce_effect(float x, float y, float z, float r);
-particle_effect newton_step_effect();
-
-void linear_accel_apply(particle *p, void *data0, float dt);
-void linear_force_apply(particle *p, void *data0, float dt);
-void gravitational_force_apply(particle *p, void *data0, float dt);
-void plane_bounce_apply(particle *p, void *data0, float dt);
-void sphere_bounce_apply(particle *p, void *data0, float dt);
-void newton_step_apply(particle *p, void *data0, float dt);
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
 
 /*
  * particle effects consists of a function (apply) and userdata for
@@ -27,6 +11,27 @@ typedef struct particle_effect_naive_t {
     void (*apply)(particle *, void *, float);
     void *userdata;
 } particle_effect_naive;
+
+
+void effect_program_naive_compile(      effect_program *self, const effect_desc *desc);
+void effect_program_naive_execute(const effect_program *self,    particle_array *arr, float dt);
+void effect_program_naive_destroy(effect_program *self);
+
+particle_effect_naive linear_accel_effect(float x, float y, float z);
+particle_effect_naive linear_force_effect(float x, float y, float z);
+particle_effect_naive gravitational_force_effect(float x, float y, float z, float mu);
+particle_effect_naive plane_bounce_effect(float x, float y, float z, float d);
+particle_effect_naive sphere_bounce_effect(float x, float y, float z, float r);
+particle_effect_naive newton_step_effect();
+
+void linear_accel_apply(particle *p, void *data0, float dt);
+void linear_force_apply(particle *p, void *data0, float dt);
+void gravitational_force_apply(particle *p, void *data0, float dt);
+void plane_bounce_apply(particle *p, void *data0, float dt);
+void sphere_bounce_apply(particle *p, void *data0, float dt);
+void newton_step_apply(particle *p, void *data0, float dt);
+
+
 
 int effect_program_create_naive(effect_program *p) {
     memset(p, 0, sizeof(effect_program));
@@ -40,7 +45,7 @@ int effect_program_create_naive(effect_program *p) {
 void effect_program_naive_destroy(effect_program *self) {
     if (self->usr != NULL) {
         // free last compilation result:
-        particle_effect_naive *effects = (particle_effect_naive *)sefl->usr;
+        particle_effect_naive *effects = (particle_effect_naive *)self->usr;
         for(size_t j = 0; effects[j].apply != NULL; ++j) {
             if (effects[j].userdata != NULL) {
                 free(effects[j].userdata);
@@ -57,12 +62,12 @@ void effect_program_naive_compile(effect_program *self, const effect_desc *desc)
     }
     // compile ...
     size_t count = desc->size;
-    sefl->usr = malloc((count + 1) * sizeof(particle_effect_naive));
-    particle_effect_naive *effects = (particle_effect_naive *)sefl->usr;
+    self->usr = malloc((count + 1) * sizeof(particle_effect_naive));
+    particle_effect_naive *effects = (particle_effect_naive *)self->usr;
     for(size_t i = 0; i < count; ++i) {
-        effect_desc_ele *el = desc->elements[i];
+        const effect_desc_ele *el = &desc->elements[i];
         switch(el->type) {
-            case EFFECT_TYPE_LINEAR_FORCE:
+            case EFFECT_TYPE_LINEAR_ACCEL:
                 effects[i] = linear_accel_effect(       el->float_usr[0], 
                                                         el->float_usr[1], 
                                                         el->float_usr[2]);
@@ -103,9 +108,9 @@ void effect_program_naive_execute(const effect_program *self, particle_array *ar
         return;
     }
     particle_effect_naive *effects = (particle_effect_naive *)self->usr;
-    for(size_t i = 0; i < array->size; ++i) {
+    for(size_t i = 0; i < arr->size; ++i) {
         for(size_t j = 0; effects[j].apply != NULL; ++j) {
-            effects[j].apply(&array->particles[i], effects[j].userdata, dt);
+            effects[j].apply(&arr->particles[i], effects[j].userdata, dt);
         }
     }
 }
@@ -117,8 +122,8 @@ void linear_accel_apply(particle *p, void *data0, float dt) {
     p->velocity[2] += dt*data[2];
 }
 
-particle_effect linear_accel_effect(float x, float y, float z) {
-    particle_effect result;
+particle_effect_naive linear_accel_effect(float x, float y, float z) {
+    particle_effect_naive result;
     result.apply = linear_accel_apply;
     float *data = malloc(3*sizeof(float));
     data[0] = x;
@@ -135,8 +140,8 @@ void linear_force_apply(particle *p, void *data0, float dt) {
     p->velocity[2] += dt*data[2] / p->mass;
 }
 
-particle_effect linear_force_effect(float x, float y, float z) {
-    particle_effect result;
+particle_effect_naive linear_force_effect(float x, float y, float z) {
+    particle_effect_naive result;
     result.apply = linear_force_apply;
     float *data = malloc(3*sizeof(float));
     data[0] = x;
@@ -160,8 +165,8 @@ void gravitational_force_apply(particle *p, void *data0, float dt) {
     p->velocity[2] += dt*mu*diff[2]*r3;
 }
 
-particle_effect gravitational_force_effect(float x, float y, float z, float mu) {
-    particle_effect result;
+particle_effect_naive gravitational_force_effect(float x, float y, float z, float mu) {
+    particle_effect_naive result;
     result.apply = gravitational_force_apply;
     float *data = malloc(4*sizeof(float));
     data[0] = x;
@@ -184,8 +189,8 @@ void plane_bounce_apply(particle *p, void *data0, float dt) {
     }
 }
 
-particle_effect plane_bounce_effect(float x, float y, float z, float d) {
-    particle_effect result;
+particle_effect_naive plane_bounce_effect(float x, float y, float z, float d) {
+    particle_effect_naive result;
     result.apply = plane_bounce_apply;
     float *data = malloc(4*sizeof(float));
     float r = sqrt(x*x + y*y + z*z);
@@ -216,8 +221,8 @@ void sphere_bounce_apply(particle *p, void *data0, float dt) {
     }
 }
 
-particle_effect sphere_bounce_effect(float x, float y, float z, float r) {
-    particle_effect result;
+particle_effect_naive sphere_bounce_effect(float x, float y, float z, float r) {
+    particle_effect_naive result;
     result.apply = sphere_bounce_apply;
     float *data = malloc(4*sizeof(float));
     data[0] = x;
@@ -235,8 +240,8 @@ void newton_step_apply(particle *p, void *data0, float dt) {
     p->position[2] += dt*p->velocity[2];
 }
 
-particle_effect newton_step_effect() {
-    particle_effect result;
+particle_effect_naive newton_step_effect() {
+    particle_effect_naive result;
     result.apply = newton_step_apply;
     result.userdata = NULL;
     return result;
