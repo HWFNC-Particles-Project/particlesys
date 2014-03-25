@@ -30,6 +30,10 @@ int main(int argc, char *argv[]) {
     // execute
     effect_program_execute(&naive_program, &arr, 0.01);
     
+    for(size_t i = 0; i < arr.size; ++i) {
+        printf("%.3f, %.3f, %.3f\n", arr.particles[i].position[0], arr.particles[i].position[1], arr.particles[i].position[2]);
+    }
+    
     // clean up:
     effect_desc_destroy(&effects);
     effect_program_destroy(&naive_program);
