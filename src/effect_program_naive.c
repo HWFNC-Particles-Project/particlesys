@@ -100,6 +100,9 @@ void effect_program_naive_compile(effect_program *self, const effect_desc *desc)
                 break;
         }
     }
+    effects[count].apply = NULL;
+    effects[count].userdata = NULL;
+                
 }
 
 void effect_program_naive_execute(const effect_program *self, particle_array *arr, float dt) {
@@ -193,7 +196,7 @@ particle_effect_naive plane_bounce_effect(float x, float y, float z, float d) {
     particle_effect_naive result;
     result.apply = plane_bounce_apply;
     float *data = malloc(4*sizeof(float));
-    float r = sqrt(x*x + y*y + z*z);
+    float r = sqrtf(x*x + y*y + z*z);
     data[0] = x/r;
     data[1] = y/r;
     data[2] = z/r;
@@ -208,7 +211,7 @@ void sphere_bounce_apply(particle *p, void *data0, float dt) {
     normal[0] = p->position[0]-data[0];
     normal[1] = p->position[1]-data[1];
     normal[2] = p->position[2]-data[2];
-    double r = normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2];
+    double r = sqrtf(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
     normal[0] /= r;
     normal[1] /= r;
     normal[2] /= r;
