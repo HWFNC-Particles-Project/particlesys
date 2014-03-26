@@ -1,10 +1,5 @@
-#include <particle_array.h>
-
-void particle_effect_free(particle_effect *effects) {
-    for(size_t j = 0;effects[j].apply!=NULL;++j) {
-        free(effects[j].userdata);
-    }
-}
+#include "particle_array.h"
+#include <stdlib.h>
 
 int particle_array_create(particle_array *array) {
     array->size = 0;
@@ -52,12 +47,4 @@ void particle_array_set(particle_array *array, size_t i, particle p) {
 
 particle particle_array_get(particle_array *array, size_t i) {
     return array->particles[i];
-}
-
-void particle_array_apply_effects(particle_array *array, particle_effect *effects, float dt) {
-    for(size_t i = 0;i<array->size;++i) {
-        for(size_t j = 0;effects[j].apply!=NULL;++j) {
-            effects[j].apply(array->particles+i, effects[j].userdata, dt);
-        }
-    }
 }
