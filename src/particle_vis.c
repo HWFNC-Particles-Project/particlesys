@@ -258,8 +258,8 @@ void particle_vis_draw(particle_array *particles) {
     float aspect = width/(float)height;
     float transform[16];
     transform_identity(transform);
-    transform_scale(transform, 1, aspect, 1);
-    transform_rotate_x(transform, beta);
+    transform_scale(transform, 0.5f, 0.5f*aspect, 0.5f);
+    transform_rotate_x(transform, -beta);
     transform_rotate_y(transform, alpha);
 
     glUniformMatrix4fv(glGetUniformLocation(window->shader_program, "transform"), 1, GL_FALSE, transform);
