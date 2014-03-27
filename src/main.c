@@ -3,10 +3,24 @@
 #include "particle_array.h"
 #include "effect_program_naive.h"
 #include "particle_vis.h"
+#include "performance_measurement.h"
+
+#define LOGGING 1;
+#define LOGFILE "perf_log"
 
 int main(int argc, char *argv[]) {
     (void) argc; (void) argv;
     
+	FILE* logfile;
+	logfile = fopen(LOGFILE, "w");
+
+	perf_measure perf_default{"default measurement", 0.0, LOGGING, logfile};
+	perf_measure perf_program_creation = perf_default;
+	program_creation.name = "creation";
+	perf_measure perf_program_execution = perf_default;
+	perf_program_execution.name = "execution";
+	perf_measurement_init();
+
     particle_vis_init();
     
     particle_array arr;
@@ -35,11 +49,15 @@ int main(int argc, char *argv[]) {
     effect_desc_add_plane_bounce(&effects, 0, 0, -1, -1);
     effect_desc_add_newton_step (&effects);
     // create program:
+	perf_start_measurement(perf_program_creation);
     effect_program naive_program;
     effect_program_create_naive(&naive_program);
     // compile
     effect_program_compile(&naive_program, &effects);
+	perf_stop_measurement(perf_program_creation);
+
     // execute
+	perf_start_measurement(perf_program_execution);
     for(int i = 0;i<10000;++i) {
         effect_program_execute(&naive_program, &arr, 0.001);
         particle_vis_draw(&arr);
@@ -47,11 +65,12 @@ int main(int argc, char *argv[]) {
     for(size_t i = 0; i < arr.size; ++i) {
         printf("%.3f, %.3f, %.3f\n", arr.particles[i].position[0], arr.particles[i].position[1], arr.particles[i].position[2]);
     }
-    
+    perf_stop_measurement(perf_program_execution);
     // clean up:
     effect_desc_destroy(&effects);
     effect_program_destroy(&naive_program);
     particle_array_destroy(&arr);
     particle_vis_deinit();
+	fclose(logfile);
     return 0;
 }
