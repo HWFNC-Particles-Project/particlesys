@@ -1,4 +1,4 @@
-#include <particle_array.h>
+#include "particle_array.h"
 
 #ifdef NO_VIS
 // dummy implementation
