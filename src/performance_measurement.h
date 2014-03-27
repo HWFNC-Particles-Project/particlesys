@@ -6,14 +6,14 @@ int perf_measurement_init();
 
 typedef struct perf_measure perf_measure;
 struct perf_measure{
-	int bool_log;
-	double start;
 	char* name;
+	double start;
+	int bool_log;
 	FILE* logfile;
 };
 
-void start_measurement(perf_measure pm);
-void stop_measurement(perf_measure pm);
+void perf_start_measurement(perf_measure* pm);
+void perf_stop_measurement(perf_measure* pm);
 
 
 
