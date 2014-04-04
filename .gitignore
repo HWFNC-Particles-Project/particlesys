@@ -1,0 +1,8 @@
+obj
+*.save
+*.depend
+*.exe
+*.dll
+*.bmarks
+*.layout
+perf_log
