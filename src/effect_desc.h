@@ -74,17 +74,19 @@ int effect_desc_add_central_force(effect_desc *ctx, float x, float y, float z, f
  *  @param ctx Effect description array context
  *  @param x, y, z Plane normal vector.
  *  @param d Plane offset.
+ *  @param a Bounce attenuation. 1.0 = no attenuation.
  *  @return effect index on success, -1 on error.
  */
-int effect_desc_add_plane_bounce (effect_desc *ctx, float x, float y, float z, float d);
+int effect_desc_add_plane_bounce (effect_desc *ctx, float x, float y, float z, float d, float a);
 /** Adds a sphere bounce effect.
  *  The particles will bounce off the the sphere.
  *  @param ctx Effect description array context
  *  @param x, y, z Sphere centre point
  *  @param r Sphere diameter
+ *  @param a Bounce attenuation. 1.0 = no attenuation.
  *  @return effect index on success, -1 on error.
  */
-int effect_desc_add_sphere_bounce(effect_desc *ctx, float x, float y, float z, float r);
+int effect_desc_add_sphere_bounce(effect_desc *ctx, float x, float y, float z, float r, float a);
 /** Adds a newton simulation step effect.
  *  This will update the particle positions according to their velocity.
  *  @param ctx Effect description array context

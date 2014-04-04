@@ -99,7 +99,7 @@ int effect_desc_add_central_force(effect_desc *ctx, float x, float y, float z, f
     return effect_desc_add_element(ctx, &e);
 }
 
-int effect_desc_add_plane_bounce (effect_desc *ctx, float x, float y, float z, float d) {
+int effect_desc_add_plane_bounce (effect_desc *ctx, float x, float y, float z, float d, float a) {
     effect_desc_ele e;
     memset(&e, 0, sizeof(effect_desc_ele));
     e.type = EFFECT_TYPE_PLANE_BOUNCE;
@@ -107,10 +107,11 @@ int effect_desc_add_plane_bounce (effect_desc *ctx, float x, float y, float z, f
     e.float_usr[1] = y;
     e.float_usr[2] = z;
     e.float_usr[3] = d;
+    e.float_usr[4] = a;
     return effect_desc_add_element(ctx, &e);
 }
 
-int effect_desc_add_sphere_bounce(effect_desc *ctx, float x, float y, float z, float r) {
+int effect_desc_add_sphere_bounce(effect_desc *ctx, float x, float y, float z, float r, float a) {
     effect_desc_ele e;
     memset(&e, 0, sizeof(effect_desc_ele));
     e.type = EFFECT_TYPE_SPHERE_BOUNCE;
@@ -118,6 +119,7 @@ int effect_desc_add_sphere_bounce(effect_desc *ctx, float x, float y, float z, f
     e.float_usr[1] = y;
     e.float_usr[2] = z;
     e.float_usr[3] = r;
+    e.float_usr[4] = a;
     return effect_desc_add_element(ctx, &e);
 }
 

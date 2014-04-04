@@ -20,8 +20,8 @@ void effect_program_naive_destroy(effect_program *self);
 particle_effect_naive linear_accel_effect(float x, float y, float z);
 particle_effect_naive linear_force_effect(float x, float y, float z);
 particle_effect_naive gravitational_force_effect(float x, float y, float z, float mu);
-particle_effect_naive plane_bounce_effect(float x, float y, float z, float d);
-particle_effect_naive sphere_bounce_effect(float x, float y, float z, float r);
+particle_effect_naive plane_bounce_effect(float x, float y, float z, float d, float a);
+particle_effect_naive sphere_bounce_effect(float x, float y, float z, float r, float a);
 particle_effect_naive newton_step_effect();
 
 void linear_accel_apply(particle *p, void *data0, float dt);
@@ -87,13 +87,15 @@ void effect_program_naive_compile(effect_program *self, const effect_desc *desc)
                 effects[i] = plane_bounce_effect(       el->float_usr[0], 
                                                         el->float_usr[1], 
                                                         el->float_usr[2], 
-                                                        el->float_usr[3]);
+                                                        el->float_usr[3], 
+                                                        el->float_usr[4]);
                 break;
             case EFFECT_TYPE_SPHERE_BOUNCE:
                 effects[i] = sphere_bounce_effect(      el->float_usr[0], 
                                                         el->float_usr[1], 
                                                         el->float_usr[2], 
-                                                        el->float_usr[3]);
+                                                        el->float_usr[3], 
+                                                        el->float_usr[4]);
                 break;
             case EFFECT_TYPE_NEWTON_STEP:
                 effects[i] = newton_step_effect();
@@ -186,21 +188,22 @@ void plane_bounce_apply(particle *p, void *data0, float dt) {
     float vnormal = data[0]*p->velocity[0] + data[1]*p->velocity[1] + data[2]*p->velocity[2];
     float d = data[3];
     if(dist<d && vnormal<0) {
-        p->velocity[0] -= 2.0*vnormal*data[0];
-        p->velocity[1] -= 2.0*vnormal*data[1];
-        p->velocity[2] -= 2.0*vnormal*data[2];
+        p->velocity[0] -= (1.0+data[4])*vnormal*data[0];
+        p->velocity[1] -= (1.0+data[4])*vnormal*data[1];
+        p->velocity[2] -= (1.0+data[4])*vnormal*data[2];
     }
 }
 
-particle_effect_naive plane_bounce_effect(float x, float y, float z, float d) {
+particle_effect_naive plane_bounce_effect(float x, float y, float z, float d, float a) {
     particle_effect_naive result;
     result.apply = plane_bounce_apply;
-    float *data = malloc(4*sizeof(float));
+    float *data = malloc(5*sizeof(float));
     float r = sqrtf(x*x + y*y + z*z);
     data[0] = x/r;
     data[1] = y/r;
     data[2] = z/r;
     data[3] = d/r;
+    data[4] = a;
     result.userdata = data;
     return result;
 }
@@ -218,20 +221,21 @@ void sphere_bounce_apply(particle *p, void *data0, float dt) {
     float vnormal = normal[0]*p->velocity[0] + normal[1]*p->velocity[1] + normal[2]*p->velocity[2];
     float d = data[3];
     if(r<d && vnormal<0) {
-        p->velocity[0] -= 2.0*vnormal*normal[0];
-        p->velocity[1] -= 2.0*vnormal*normal[1];
-        p->velocity[2] -= 2.0*vnormal*normal[2];
+        p->velocity[0] -= (1.0+data[4])*vnormal*normal[0];
+        p->velocity[1] -= (1.0+data[4])*vnormal*normal[1];
+        p->velocity[2] -= (1.0+data[4])*vnormal*normal[2];
     }
 }
 
-particle_effect_naive sphere_bounce_effect(float x, float y, float z, float r) {
+particle_effect_naive sphere_bounce_effect(float x, float y, float z, float r, float a) {
     particle_effect_naive result;
     result.apply = sphere_bounce_apply;
-    float *data = malloc(4*sizeof(float));
+    float *data = malloc(5*sizeof(float));
     data[0] = x;
     data[1] = y;
     data[2] = z;
     data[3] = r;
+    data[4] = a;
     result.userdata = data;
     return result;
 }
