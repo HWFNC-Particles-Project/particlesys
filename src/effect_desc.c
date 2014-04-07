@@ -52,7 +52,7 @@ int effect_desc_add_element(effect_desc *ctx, effect_desc_ele *e) {
 }
 
 int effect_desc_remove(effect_desc *ctx, int idx) {
-    if (idx < 0 || idx >= ctx->size) return -1;
+    if (idx < 0 || idx >= (int)ctx->size) return -1;
     effect_desc_ele *e = &ctx->elements[idx];
     switch(e->type) {
         case EFFECT_TYPE_LINEAR_ACCEL:

@@ -6,7 +6,7 @@
 /*
  * particle effects consists of a function (apply) and userdata for
  * effect specific data that is passed as second function to apply
- */ 
+ */
 typedef struct particle_effect_naive_t {
     void (*apply)(particle *, void *, float);
     void *userdata;
@@ -68,33 +68,33 @@ void effect_program_naive_compile(effect_program *self, const effect_desc *desc)
         const effect_desc_ele *el = &desc->elements[i];
         switch(el->type) {
             case EFFECT_TYPE_LINEAR_ACCEL:
-                effects[i] = linear_accel_effect(       el->float_usr[0], 
-                                                        el->float_usr[1], 
+                effects[i] = linear_accel_effect(       el->float_usr[0],
+                                                        el->float_usr[1],
                                                         el->float_usr[2]);
                 break;
             case EFFECT_TYPE_LINEAR_FORCE:
-                effects[i] = linear_force_effect(       el->float_usr[0], 
-                                                        el->float_usr[1], 
+                effects[i] = linear_force_effect(       el->float_usr[0],
+                                                        el->float_usr[1],
                                                         el->float_usr[2]);
                 break;
             case EFFECT_TYPE_CENTRAL_FORCE:
-                effects[i] = gravitational_force_effect(el->float_usr[0], 
-                                                        el->float_usr[1], 
-                                                        el->float_usr[2], 
+                effects[i] = gravitational_force_effect(el->float_usr[0],
+                                                        el->float_usr[1],
+                                                        el->float_usr[2],
                                                         el->float_usr[3]);
                 break;
             case EFFECT_TYPE_PLANE_BOUNCE:
-                effects[i] = plane_bounce_effect(       el->float_usr[0], 
-                                                        el->float_usr[1], 
-                                                        el->float_usr[2], 
-                                                        el->float_usr[3], 
+                effects[i] = plane_bounce_effect(       el->float_usr[0],
+                                                        el->float_usr[1],
+                                                        el->float_usr[2],
+                                                        el->float_usr[3],
                                                         el->float_usr[4]);
                 break;
             case EFFECT_TYPE_SPHERE_BOUNCE:
-                effects[i] = sphere_bounce_effect(      el->float_usr[0], 
-                                                        el->float_usr[1], 
-                                                        el->float_usr[2], 
-                                                        el->float_usr[3], 
+                effects[i] = sphere_bounce_effect(      el->float_usr[0],
+                                                        el->float_usr[1],
+                                                        el->float_usr[2],
+                                                        el->float_usr[3],
                                                         el->float_usr[4]);
                 break;
             case EFFECT_TYPE_NEWTON_STEP:
@@ -104,7 +104,7 @@ void effect_program_naive_compile(effect_program *self, const effect_desc *desc)
     }
     effects[count].apply = NULL;
     effects[count].userdata = NULL;
-                
+
 }
 
 void effect_program_naive_execute(const effect_program *self, particle_array *arr, float dt) {
@@ -183,6 +183,7 @@ particle_effect_naive gravitational_force_effect(float x, float y, float z, floa
 }
 
 void plane_bounce_apply(particle *p, void *data0, float dt) {
+    (void) dt;
     float *data = data0;
     float dist = data[0]*p->position[0] + data[1]*p->position[1] + data[2]*p->position[2];
     float vnormal = data[0]*p->velocity[0] + data[1]*p->velocity[1] + data[2]*p->velocity[2];
@@ -209,6 +210,7 @@ particle_effect_naive plane_bounce_effect(float x, float y, float z, float d, fl
 }
 
 void sphere_bounce_apply(particle *p, void *data0, float dt) {
+    (void) dt;
     float *data = data0;
     float normal[3];
     normal[0] = p->position[0]-data[0];
