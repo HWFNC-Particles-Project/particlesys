@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
 
     particle_array arr;
     particle_array_create(&arr);
-    unsigned int N = 16;
+    unsigned int N = 32;
     for(size_t i = 0;i<N;++i) {
         for(size_t j = 0;j<N;++j) {
             particle p;
@@ -36,17 +36,19 @@ int main(int argc, char *argv[]) {
             particle_array_add(&arr, p);
         }
     }
+
     effect_desc effects;
     effect_desc_init(&effects);
     // construct effect array:
     effect_desc_add_linear_accel(&effects,  0, -10, 0);
-    effect_desc_add_sphere_bounce(&effects, 0,  0,  0, 0.707, 0.9);
-    effect_desc_add_plane_bounce(&effects,  0,  1,  0, -1,    0.9);
-    effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.9);
-    effect_desc_add_plane_bounce(&effects,  1,  0,  0, -1,    0.9);
-    effect_desc_add_plane_bounce(&effects, -1,  0,  0, -1,    0.9);
-    effect_desc_add_plane_bounce(&effects,  0,  0,  1, -1,    0.9);
-    effect_desc_add_plane_bounce(&effects,  0,  0, -1, -1,    0.9);
+    effect_desc_add_sphere_collision(&effects,  0.03, 0.7);
+    effect_desc_add_sphere_bounce(&effects, 0,  0,  0, 0.707, 0.8);
+    effect_desc_add_plane_bounce(&effects,  0,  1,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  1,  0,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects, -1,  0,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  0,  0,  1, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  0,  0, -1, -1,    0.8);
     effect_desc_add_newton_step (&effects);
     // create program:
 
@@ -62,7 +64,7 @@ int main(int argc, char *argv[]) {
     // execute
 	perf_start_measurement(&perf_program_execution);
 
-    for(int i = 0;i<10000;++i) {
+    for(int i = 0;i<1000;++i) {
         effect_program_execute(&naive_program, &arr, 0.005);
         particle_vis_draw(&arr);
     }

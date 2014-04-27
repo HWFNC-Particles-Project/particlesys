@@ -10,7 +10,14 @@ typedef enum effect_type_t {
     EFFECT_TYPE_CENTRAL_FORCE,  ///< Central force effect
     EFFECT_TYPE_PLANE_BOUNCE,   ///< Plane bounce effect
     EFFECT_TYPE_SPHERE_BOUNCE,  ///< Sphere bounce effect
-    EFFECT_TYPE_NEWTON_STEP     ///< Newton simulation step effect
+    EFFECT_TYPE_NEWTON_STEP,    ///< Newton simulation step effect
+    EFFECT_TYPE_GRAVITY_FORCE,  ///< pairwise gravitational force
+    EFFECT_TYPE_SPHERE_COLLISION///< particle collision
+    
+/*
+    EFFECT_TYPE_LENNARD_JONES_FORCE,
+    EFFECT_TYPE_FORCE_FIELD,
+ */
 } effect_type;
 
 /** Effect description element struct
@@ -87,6 +94,19 @@ int effect_desc_add_plane_bounce (effect_desc *ctx, float x, float y, float z, f
  *  @return effect index on success, -1 on error.
  */
 int effect_desc_add_sphere_bounce(effect_desc *ctx, float x, float y, float z, float r, float a);
+/** Adds a pairwise gravitation force between particles.
+ *  Applies a acceleration of mu*m1*m1/r^2
+ *  @param ctx Effect description array context
+ *  @param mu force constant
+ *  @return effect index on success, -1 on error.
+ */
+int effect_desc_add_gravity_force(effect_desc *ctx, float mu);
+/** Adds a newton simulation step effect.
+ *  This will update the particle positions according to their velocity.
+ *  @param ctx Effect description array context
+ *  @return effect index on success, -1 on error.
+ */
+int effect_desc_add_sphere_collision(effect_desc *ctx, float radius, float restitution);
 /** Adds a newton simulation step effect.
  *  This will update the particle positions according to their velocity.
  *  @param ctx Effect description array context

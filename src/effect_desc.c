@@ -60,6 +60,8 @@ int effect_desc_remove(effect_desc *ctx, int idx) {
         case EFFECT_TYPE_CENTRAL_FORCE:
         case EFFECT_TYPE_PLANE_BOUNCE:
         case EFFECT_TYPE_SPHERE_BOUNCE:
+        case EFFECT_TYPE_GRAVITY_FORCE:
+        case EFFECT_TYPE_SPHERE_COLLISION:
         case EFFECT_TYPE_NEWTON_STEP:
             // nothing todo for this effect type.
             break;
@@ -120,6 +122,23 @@ int effect_desc_add_sphere_bounce(effect_desc *ctx, float x, float y, float z, f
     e.float_usr[2] = z;
     e.float_usr[3] = r;
     e.float_usr[4] = a;
+    return effect_desc_add_element(ctx, &e);
+}
+
+int effect_desc_add_gravity_force(effect_desc *ctx, float mu) {
+    effect_desc_ele e;
+    memset(&e, 0, sizeof(effect_desc_ele));
+    e.type = EFFECT_TYPE_GRAVITY_FORCE;
+    e.float_usr[0] = mu;
+    return effect_desc_add_element(ctx, &e);
+}
+
+int effect_desc_add_sphere_collision(effect_desc *ctx, float radius, float restitution){
+    effect_desc_ele e;
+    memset(&e, 0, sizeof(effect_desc_ele));
+    e.type = EFFECT_TYPE_SPHERE_COLLISION;
+    e.float_usr[0] = 2*radius;
+    e.float_usr[1] = restitution;
     return effect_desc_add_element(ctx, &e);
 }
 
