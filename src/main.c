@@ -9,13 +9,14 @@
 #define LOGGING 1
 #define LOGFILE "perf_log"
 
+
 int main(int argc, char *argv[]) {
     (void) argc; (void) argv;
 
 	FILE* logfile;
 	logfile = fopen(LOGFILE, "w");
 
-    perf_measure perf_default = {"default measurement", 0.0, LOGGING, logfile};
+    perf_measure perf_default = {"default measurement", 0, 0, LOGGING, logfile};
     perf_measure perf_program_creation = perf_default;
     perf_program_creation.name = "creation";
     perf_measure perf_program_execution = perf_default;
@@ -83,13 +84,17 @@ int main(int argc, char *argv[]) {
     // execute
 	perf_start_measurement(&perf_program_execution);
 
-    for(int i = 0;i<10000;++i) {
+    for(int i = 0;i<NUM_ITER;++i) {
         effect_program_execute(&naive_program, &arr, 0.005);
         particle_vis_draw(&arr);
+        if(i%50==0){printf("%d-th iteration\n",i);}
     }
 
     perf_stop_measurement(&perf_program_execution);
 
+    // print mesurements
+    perf_print_measurement(&perf_program_creation);
+    perf_print_measurement(&perf_program_execution);
     // clean up:
     effect_desc_destroy(&effects);
     effect_program_destroy(&naive_program);
