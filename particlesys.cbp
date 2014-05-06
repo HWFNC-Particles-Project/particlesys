@@ -13,6 +13,8 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add directory="/usr/include" />
+					<Add directory="/usr/local/include" />
 				</Compiler>
 			</Target>
 			<Target title="Release">
@@ -32,23 +34,13 @@
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
 			<Add option="-std=c99" />
-			<Add option="-DNO_PERF" />
+			<Add option="-DNO_VIS" />
 			<Add directory="$(#sdl.include)" />
 			<Add directory="$(#glew.include)" />
 		</Compiler>
 		<Linker>
-			<Add library="mingw32" />
 			<Add library="SDL2main" />
 			<Add library="SDL2" />
-			<Add library="user32" />
-			<Add library="gdi32" />
-			<Add library="winmm" />
-			<Add library="dxguid" />
-			<Add library="glew32" />
-			<Add library="glew32s" />
-			<Add library="opengl32" />
-			<Add library="glu32" />
-			<Add library="glew32d" />
 			<Add directory="$(#sdl.lib)" />
 			<Add directory="$(#glew.lib)" />
 			<Add directory="$(#glew.bin)" />
