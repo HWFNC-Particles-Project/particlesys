@@ -3,7 +3,7 @@
 
 int particle_array_create(particle_array *array) {
     array->size = 0;
-    array->capacity = 4;
+    array->capacity = 8;
     array->particles = malloc(array->capacity*sizeof(particle));
     return array->particles == NULL;
 }
@@ -33,7 +33,7 @@ int particle_array_reserve(particle_array *array, size_t capacity) {
 
 int particle_array_add(particle_array *array, particle p) {
     if(array->size == array->capacity) {
-        if(particle_array_reserve(array, array->capacity/2*3)) {
+        if(particle_array_reserve(array, array->capacity*2)) {
             return 1;
         }
     }

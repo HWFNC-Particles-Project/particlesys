@@ -110,12 +110,13 @@ void effect_program_naive_compile(effect_program *self, const effect_desc *desc)
             case EFFECT_TYPE_GRAVITY_FORCE:
                 effects[i] = pairwise_gravitational_force_effect(el->float_usr[0]);
                 break;
-                
+
             case EFFECT_TYPE_SPHERE_COLLISION:
                 effects[i] = pairwise_sphere_collision_effect(  el->float_usr[0],
                                                                 el->float_usr[1]);
                 break;
-
+            default:
+                break; // unhandled effect
         }
     }
     effects[count].apply.one = NULL;
@@ -163,9 +164,9 @@ particle_effect_naive linear_accel_effect(float x, float y, float z) {
 
 void linear_force_apply(particle *p, void *data0, float dt) {
     float *data = data0;
-    p->velocity[0] += dt*data[0] / p->mass;
-    p->velocity[1] += dt*data[1] / p->mass;
-    p->velocity[2] += dt*data[2] / p->mass;
+    p->velocity[0] += data[0] * (dt/p->mass);
+    p->velocity[1] += data[1] * (dt/p->mass);
+    p->velocity[2] += data[2] * (dt/p->mass);
 }
 
 particle_effect_naive linear_force_effect(float x, float y, float z) {
@@ -216,8 +217,8 @@ void plane_bounce_apply(particle *p, void *data0, float dt) {
     if(dist<d && vnormal<0) {
         p->velocity[0] -= 2.0f*vnormal*data[0];
         p->velocity[1] -= 2.0f*vnormal*data[1];
-        p->velocity[2] -= 2.0f*vnormal*data[2];        
-        
+        p->velocity[2] -= 2.0f*vnormal*data[2];
+
         p->velocity[0] *= data[4];
         p->velocity[1] *= data[4];
         p->velocity[2] *= data[4];
@@ -329,12 +330,12 @@ void pairwise_sphere_collision_apply(particle *p1, particle *p2, void *data0, fl
     float m2 = p2->mass;
     float u1 = p1->velocity[0]*diff[0] + p1->velocity[1]*diff[1] + p1->velocity[2]*diff[2];
     float u2 = p2->velocity[0]*diff[0] + p2->velocity[1]*diff[1] + p2->velocity[2]*diff[2];
-    
+
     if(r<radius) {
         if(u2<u1) {
             float v1 = (u1*m1+u2*m2+restitution*m2*(u2-u1))/(m1+m2);
             float v2 = (u2*m2+u1*m1+restitution*m1*(u1-u2))/(m1+m2);
-            
+
             p1->velocity[0] += (v1-u1)*diff[0];
             p1->velocity[1] += (v1-u1)*diff[1];
             p1->velocity[2] += (v1-u1)*diff[2];
@@ -342,13 +343,13 @@ void pairwise_sphere_collision_apply(particle *p1, particle *p2, void *data0, fl
             p2->velocity[1] += (v2-u2)*diff[1];
             p2->velocity[2] += (v2-u2)*diff[2];
         }
-        
+
         p1->position[0] -= 0.5f*(radius-r)*diff[0];
         p1->position[1] -= 0.5f*(radius-r)*diff[1];
         p1->position[2] -= 0.5f*(radius-r)*diff[2];
         p2->position[0] += 0.5f*(radius-r)*diff[0];
         p2->position[1] += 0.5f*(radius-r)*diff[1];
-        p2->position[2] += 0.5f*(radius-r)*diff[2];        
+        p2->position[2] += 0.5f*(radius-r)*diff[2];
     }
 }
 

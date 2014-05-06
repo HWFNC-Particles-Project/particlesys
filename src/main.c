@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "particle_array.h"
 #include "effect_program_naive.h"
+#include "effect_program_jit.h"
 #include "particle_vis.h"
 #include "performance_measurement.h"
 
@@ -40,22 +41,40 @@ int main(int argc, char *argv[]) {
     effect_desc effects;
     effect_desc_init(&effects);
     // construct effect array:
-    effect_desc_add_linear_accel(&effects,  0, -10, 0);
-    effect_desc_add_sphere_collision(&effects,  0.03, 0.7);
-    effect_desc_add_sphere_bounce(&effects, 0,  0,  0, 0.707, 0.8);
-    effect_desc_add_plane_bounce(&effects,  0,  1,  0, -1,    0.8);
-    effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
-    effect_desc_add_plane_bounce(&effects,  1,  0,  0, -1,    0.8);
-    effect_desc_add_plane_bounce(&effects, -1,  0,  0, -1,    0.8);
-    effect_desc_add_plane_bounce(&effects,  0,  0,  1, -1,    0.8);
-    effect_desc_add_plane_bounce(&effects,  0,  0, -1, -1,    0.8);
+    //~ effect_desc_add_linear_accel(&effects,  0, -10, 0);
+
+    //~ effect_desc_add_sphere_collision(&effects,  0.03, 0.7);
+
+    //~ effect_desc_add_sphere_bounce(&effects, 0,  0,  0, 0.707, 0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0,  1,  0, -1,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  1,  0,  0, -1,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects, -1,  0,  0, -1,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0,  0,  1, -1,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0,  0, -1, -1,    0.8);
+
+    effect_desc_add_central_force(&effects, 1, 0, 1, -1);
+    effect_desc_add_central_force(&effects,-1, 0, 1, -1);
+    effect_desc_add_central_force(&effects, 1, 0,-1, -1);
+    effect_desc_add_central_force(&effects,-1, 0,-1, -1);
+
+    effect_desc_add_sphere_bounce(&effects, 1, 0, 1, 1.0, 0.95);
+    effect_desc_add_sphere_bounce(&effects,-1, 0, 1, 1.0, 0.95);
+    effect_desc_add_sphere_bounce(&effects, 1, 0,-1, 1.0, 0.95);
+    effect_desc_add_sphere_bounce(&effects,-1, 0,-1, 1.0, 0.95);
+
+
     effect_desc_add_newton_step (&effects);
+
     // create program:
 
     perf_start_measurement(&perf_program_creation);
 
     effect_program naive_program;
-    effect_program_create_naive(&naive_program);
+
+    //~ effect_program_create_naive(&naive_program);
+    effect_program_create_jit(&naive_program);
+
     // compile
     effect_program_compile(&naive_program, &effects);
 
@@ -64,7 +83,7 @@ int main(int argc, char *argv[]) {
     // execute
 	perf_start_measurement(&perf_program_execution);
 
-    for(int i = 0;i<1000;++i) {
+    for(int i = 0;i<10000;++i) {
         effect_program_execute(&naive_program, &arr, 0.005);
         particle_vis_draw(&arr);
     }

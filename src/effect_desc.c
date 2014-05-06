@@ -63,6 +63,7 @@ int effect_desc_remove(effect_desc *ctx, int idx) {
         case EFFECT_TYPE_GRAVITY_FORCE:
         case EFFECT_TYPE_SPHERE_COLLISION:
         case EFFECT_TYPE_NEWTON_STEP:
+        case EFFECT_TYPE_COUNT:
             // nothing todo for this effect type.
             break;
     }

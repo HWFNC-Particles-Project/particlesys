@@ -12,12 +12,9 @@ typedef enum effect_type_t {
     EFFECT_TYPE_SPHERE_BOUNCE,  ///< Sphere bounce effect
     EFFECT_TYPE_NEWTON_STEP,    ///< Newton simulation step effect
     EFFECT_TYPE_GRAVITY_FORCE,  ///< pairwise gravitational force
-    EFFECT_TYPE_SPHERE_COLLISION///< particle collision
-    
-/*
-    EFFECT_TYPE_LENNARD_JONES_FORCE,
-    EFFECT_TYPE_FORCE_FIELD,
- */
+    EFFECT_TYPE_SPHERE_COLLISION,///< particle collision
+
+    EFFECT_TYPE_COUNT
 } effect_type;
 
 /** Effect description element struct
