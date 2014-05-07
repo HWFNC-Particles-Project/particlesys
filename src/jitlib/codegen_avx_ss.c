@@ -7,6 +7,7 @@
 
 #include <plasm.h>
 #include <codegen.h>
+#include <ssa_print.h>
 
 static mnemonic_t ssa2asm_ss[] = {
     [SSA_NONE]   = UNKNOWN,
@@ -36,20 +37,36 @@ static uint8_t cmpimm[] = {
 };
 
 typedef struct {
+    size_t pos;
     int *regs, *uses, *free_regs, *locked, *owner;
     int top, spillpos;
     unsigned increment;
     plasm *as;
     ssa_block *block;
+    int *start, *graph;
 } codegen_data;
 
-static void spill_operand(codegen_data *data) {
-    int j = 15;
-    for(;j>=0;--j) {
-        if(data->owner[j]>=0 && !data->locked[j])
-            break;
+int next_use(codegen_data *data, int i, int pos) {
+    for(size_t j = data->start[i];j<data->start[i+1];++j) {
+        if(data->graph[j]>pos) {
+            return data->graph[j];
+        }
     }
-    int i = data->owner[j];
+    return -1;
+}
+
+static void spill_operand(codegen_data *data) {
+    int i = 0;
+    int next = 0;
+    for(int j = 0;j<16;++j) {
+        if(data->owner[j]>=0 && !data->locked[j]) {
+            int use = next_use(data, data->owner[j], data->pos);
+            if(use>next) {
+                next = use;
+                i = data->owner[j];
+            }
+        }
+    }
 
     opspec_t src = XMM(data->regs[i]-1);
 
@@ -117,20 +134,66 @@ static void release_operand(codegen_data *data, int i) {
 
 void (*gencode_avx_ss(ssa_block *block, unsigned increment))(float*, float*, int)  {
     int uses[block->size];
+    int total_uses = 0;
     for(size_t i = 0;i<block->size;++i) {
         uint64_t op = block->buffer[i];
         uses[i] = 0;
         if(IS_UNARY(op)) {
             ++uses[GET_ARG1(op)];
+            total_uses += 1;
         } else if(IS_BINARY(op)) {
             ++uses[GET_ARG1(op)];
             ++uses[GET_ARG2(op)];
+            total_uses += 2;
         } else if(IS_TERNARY(op)) {
             ++uses[GET_ARG1(op)];
             ++uses[GET_ARG2(op)];
             ++uses[GET_ARG3(op)];
+            total_uses += 3;
         }
     }
+
+    int start[block->size+1];
+    start[block->size] = total_uses;
+
+    int dependencies[block->size];
+    int graph[total_uses];
+    int sum = 0;
+    for(size_t i = 0;i<block->size;++i) {
+        start[i] = sum;
+        sum += uses[i];
+        dependencies[i] = 0;
+        uint64_t op = block->buffer[i];
+        if(IS_UNARY(op)) {
+            graph[start[GET_ARG1(op)]++] = i;
+            dependencies[i] = 1;
+        } else if(IS_BINARY(op)) {
+            graph[start[GET_ARG1(op)]++] = i;
+            graph[start[GET_ARG2(op)]++] = i;
+            dependencies[i] = 2;
+        } else if(IS_TERNARY(op)) {
+            graph[start[GET_ARG1(op)]++] = i;
+            graph[start[GET_ARG2(op)]++] = i;
+            graph[start[GET_ARG3(op)]++] = i;
+            dependencies[i] = 3;
+        }
+    }
+    sum = 0;
+    for(size_t i = 0;i<block->size;++i) {
+        start[i] = sum;
+        sum += uses[i];
+    }
+
+    //~ for(size_t i = 0;i<block->size;++i) {
+        //~ printf("%d %d %d ", (int)i, dependencies[i], uses[i]);
+        //~ ssa_print_op(block, i);
+        //~ printf("\t\t\t");
+//~
+        //~ for(size_t j = start[i];j<start[i+1];++j) {
+            //~ printf(" %d", graph[j]);
+        //~ }
+        //~ printf("\n");
+    //~ }
 
     int regs[block->size];
     int free_regs[16] = {16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1};
@@ -147,7 +210,7 @@ void (*gencode_avx_ss(ssa_block *block, unsigned increment))(float*, float*, int
     plasm_init(&as, buffer, chunksize-sizeof(binary_header));
     void (*fun)(float*, float*, int) = (void(*)(float*, float*, int))plasm_get_current_ptr(&as);
 
-    codegen_data data = {regs, uses, free_regs, locked, owner, top, -1, increment, &as, block};
+    codegen_data data = {0, regs, uses, free_regs, locked, owner, top, -1, increment, &as, block, start, graph};
 
     float *constbase = (float*)(((uint8_t*)chunk) + chunksize);
     int constindex = -1;
@@ -163,6 +226,7 @@ void (*gencode_avx_ss(ssa_block *block, unsigned increment))(float*, float*, int
     uint8_t *loop = plasm_get_current_ptr(&as);
 
     for(size_t i = 0;i<block->size;++i) {
+        data.pos = i;
         regs[i] = 0;
         uint64_t op = block->buffer[i];
         if(GET_OP(op) == SSA_LOAD) {

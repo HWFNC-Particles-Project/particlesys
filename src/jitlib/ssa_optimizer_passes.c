@@ -1,4 +1,8 @@
+#include <stdio.h>
+#include <limits.h>
+
 #include <ssa_def.h>
+#include <ssa_print.h>
 #include <stdlib.h>
 #include <math.h>
 
@@ -30,6 +34,7 @@ void ssa_mark_dead(ssa_block *block) {
         }
         block->buffer[i] |= DEAD_BIT;
     }
+
     int stored[maxstore+1];
     for(size_t j = 0;j<=maxstore;++j) {
         stored[j] = 0;
@@ -44,18 +49,42 @@ void ssa_mark_dead(ssa_block *block) {
     }
 }
 
-void ssa_remap_duplicates(ssa_block *block) {
-    size_t window = block->size;
+size_t find_index(ssa_block *block, int *hash_map, size_t C, uint64_t op) {
+    const uint64_t p = 9223372036854775783ull;
+    uint64_t x = ssa_canonicalize_op(block, op);
+    size_t index = (p*x)%C;
+    while(hash_map[index]>=0 && x != ssa_canonicalize_op(block, block->buffer[ssa_get_index(block, hash_map[index])])) {
+        index = (index+1)%C;
+    }
+    return index;
+}
+
+void ssa_remap_duplicates(ssa_block *block, size_t window) {
+    size_t C = 2*block->size;
+    int hash_map[C];
+    for(size_t i = 0;i<C;++i) {
+        hash_map[i] = -1;
+    }
+
     for(size_t i = 0;i<block->size;++i) {
-        size_t j = i>window?i-window:0;
-        for(;j<i;++j) {
-            size_t i1 = ssa_get_index(block, i);
-            size_t j1 = ssa_get_index(block, j);
-            if(ssa_compare_op(block, block->buffer[i1], block->buffer[j1])) {
-                ssa_remap_index(block, i1, j1);
-            }
+        size_t i1 = ssa_get_index(block, i);
+        size_t index = find_index(block, hash_map, C, block->buffer[i1]);
+        if(hash_map[index]>=0) {
+            ssa_remap_index(block, i1, ssa_get_index(block, hash_map[index]));
+        } else {
+            hash_map[index] = i1;
         }
     }
+    //~ for(size_t i = 0;i<block->size;++i) {
+        //~ size_t j = i>window?i-window:0;
+        //~ for(;j<i;++j) {
+            //~ size_t i1 = ssa_get_index(block, i);
+            //~ size_t j1 = ssa_get_index(block, j);
+            //~ if(ssa_canonicalize_op(block, block->buffer[i1]) == ssa_canonicalize_op(block, block->buffer[j1])) {
+                //~ ssa_remap_index(block, i1, j1);
+            //~ }
+        //~ }
+    //~ }
 }
 
 void ssa_fuse_load_store(ssa_block *block) {
@@ -139,27 +168,6 @@ void ssa_fold_constants(ssa_block *block) {
     }
 }
 
-static void ssa_add_latencies(ssa_block *block, int *latencies, int i, int latency, const ssa_scheduling_info *info) {
-    uint64_t op = block->buffer[i];
-    latency += info[GET_OP(op)].latency;
-    if(latencies[i] < latency) {
-        latencies[i] = latency;
-    }
-    if(IS_UNARY(op)) {
-        ssa_add_latencies(block, latencies, GET_ARG1(op), latencies[i], info);
-    }
-    if(IS_BINARY(op)) {
-        ssa_add_latencies(block, latencies, GET_ARG1(op), latencies[i], info);
-        ssa_add_latencies(block, latencies, GET_ARG2(op), latencies[i], info);
-    }
-    if(IS_TERNARY(op)) {
-        ssa_add_latencies(block, latencies, GET_ARG1(op), latencies[i], info);
-        ssa_add_latencies(block, latencies, GET_ARG2(op), latencies[i], info);
-        ssa_add_latencies(block, latencies, GET_ARG3(op), latencies[i], info);
-    }
-
-}
-
 typedef struct  {
     int *data;
     int size, capacity;
@@ -172,11 +180,15 @@ void set_reserve(set *s, int cap) {
     }
 }
 
-void set_init(set *s) {
+void set_init(set *s, int capacity) {
     s->size = 0;
     s->capacity = 0;
     s->data = NULL;
-    set_reserve(s, 4);
+    set_reserve(s, capacity);
+}
+
+void set_free(set *s) {
+    free(s->data);
 }
 
 int set_find(set *s, int value) {
@@ -210,6 +222,25 @@ void set_remove(set *s, int value) {
     s->size = j;
 }
 
+static void ssa_add_latencies(ssa_block *block, int *latencies, int i, int latency, const ssa_scheduling_info *info) {
+    uint64_t op = block->buffer[i];
+    latency += info[GET_OP(op)].latency;
+    if(latencies[i] < latency) {
+        latencies[i] = latency;
+        if(IS_UNARY(op)) {
+            ssa_add_latencies(block, latencies, GET_ARG1(op), latency, info);
+        }
+        if(IS_BINARY(op)) {
+            ssa_add_latencies(block, latencies, GET_ARG1(op), latency, info);
+            ssa_add_latencies(block, latencies, GET_ARG2(op), latency, info);
+        }
+        if(IS_TERNARY(op)) {
+            ssa_add_latencies(block, latencies, GET_ARG1(op), latency, info);
+            ssa_add_latencies(block, latencies, GET_ARG2(op), latency, info);
+            ssa_add_latencies(block, latencies, GET_ARG3(op), latency, info);
+        }
+    }
+}
 
 void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
     ssa_apply_remap(block);
@@ -220,36 +251,81 @@ void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
     int uses[block->size];
     int registers = 0;
 
+    int total_uses = 0;
     for(size_t i = 0;i<block->size;++i) {
         uint64_t op = block->buffer[i];
         scheduled[i] = block->size;
-        latencies[i] = 0;
+        latencies[i] = -1;
         uses[i] = 0;
         if(GET_OP(op)==SSA_STORE) {
             ssa_add_latencies(block, latencies, i, 0, info);
             ++uses[GET_ARG1(op)];
+            total_uses += 1;
         } else if(IS_ARITHMETIC(op)) {
             if(IS_UNARY(op)) {
                 ++uses[GET_ARG1(op)];
+                total_uses += 1;
             } else if(IS_BINARY(op)) {
                 ++uses[GET_ARG1(op)];
                 ++uses[GET_ARG2(op)];
+                total_uses += 2;
             } else if(IS_TERNARY(op)) {
                 ++uses[GET_ARG1(op)];
                 ++uses[GET_ARG2(op)];
                 ++uses[GET_ARG3(op)];
+                total_uses += 3;
             }
+        }
+    }
+
+    int start[block->size+1];
+    start[block->size] = total_uses;
+
+    int dependencies[block->size];
+    int graph[total_uses];
+    int sum = 0;
+    int independents = 0;
+    for(size_t i = 0;i<block->size;++i) {
+        sum += uses[i];
+        start[i] = sum;
+        dependencies[i] = 0;
+        uint64_t op = block->buffer[i];
+        if(GET_OP(op)==SSA_STORE) {
+            graph[--start[GET_ARG1(op)]] = i;
+            dependencies[i] = 1;
+        } else if(IS_ARITHMETIC(op)) {
+            if(IS_UNARY(op)) {
+                graph[--start[GET_ARG1(op)]] = i;
+                dependencies[i] = 1;
+            } else if(IS_BINARY(op)) {
+                graph[--start[GET_ARG1(op)]] = i;
+                graph[--start[GET_ARG2(op)]] = i;
+                dependencies[i] = 2;
+            } else if(IS_TERNARY(op)) {
+                graph[--start[GET_ARG1(op)]] = i;
+                graph[--start[GET_ARG2(op)]] = i;
+                graph[--start[GET_ARG3(op)]] = i;
+                dependencies[i] = 3;
+            }
+        } else {
+            ++independents;
+        }
+    }
+
+    set open;
+    set_init(&open, independents);
+    for(size_t i = 0;i<block->size;++i) {
+        if(dependencies[i] == 0){
+            set_insert(&open, i);
         }
     }
 
     for(size_t i = 0;i<block->size;++i) {
         size_t select = 0;
-        int best = 0;
+        int best = INT_MIN;
         int dreg = 100;
-        for(size_t j = 0;j<block->size;++j) {
-            if(scheduled[j] < i) {
-                continue;
-            }
+        for(size_t k = 0;k<open.size;++k) {
+            size_t j = open.data[k];
             int score = 0;
             int registerchange = 0;
             uint64_t op = block->buffer[j];
@@ -279,9 +355,6 @@ void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
                 score += 1+latencies[j];
                 registerchange = 1;
             }
-            if(score == 0) {
-                continue;
-            }
             if(registers >= 15) {
                 score += 1000*(1-registerchange);
             }
@@ -306,12 +379,22 @@ void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
             --uses[GET_ARG3(op)];
         }
 
+        set_remove(&open, select);
+        for(int j = start[select];j<start[select+1];++j) {
+            int k = graph[j];
+            if(--dependencies[k] == 0) {
+                set_insert(&open, k);
+            }
+        }
+
         scheduled[select] = i;
-        ssa_remap_index_raw(block, select, i);
+        ssa_remap_index(block, select, i);
         newbuf[i] = op;
     }
 
+    set_free(&open);
+
     free(block->buffer);
     block->buffer = newbuf;
-    ssa_apply_remap(block);
+    ssa_apply_remap_raw(block);
 }
