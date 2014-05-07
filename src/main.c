@@ -46,22 +46,22 @@ int main(int argc, char *argv[]) {
     //~ effect_desc_add_sphere_collision(&effects,  0.03, 0.7);
 
     //~ effect_desc_add_sphere_bounce(&effects, 0,  0,  0, 0.707, 0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0,  1,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  1,  0,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects, -1,  0,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0,  0,  1, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0,  0, -1, -1,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0,  1,  0, -10,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0, -1,  0, -10,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  1,  0,  0, -10,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects, -1,  0,  0, -10,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0,  0,  1, -10,    0.8);
+    //~ effect_desc_add_plane_bounce(&effects,  0,  0, -1, -10,    0.8);
 
     effect_desc_add_central_force(&effects, 1, 0, 1, -1);
     effect_desc_add_central_force(&effects,-1, 0, 1, -1);
     effect_desc_add_central_force(&effects, 1, 0,-1, -1);
     effect_desc_add_central_force(&effects,-1, 0,-1, -1);
 
-    effect_desc_add_sphere_bounce(&effects, 1, 0, 1, 1.0, 0.95);
-    effect_desc_add_sphere_bounce(&effects,-1, 0, 1, 1.0, 0.95);
-    effect_desc_add_sphere_bounce(&effects, 1, 0,-1, 1.0, 0.95);
-    effect_desc_add_sphere_bounce(&effects,-1, 0,-1, 1.0, 0.95);
+    effect_desc_add_sphere_bounce(&effects,  1,  0,  1, 0.5, 0.9);
+    effect_desc_add_sphere_bounce(&effects,  1,  0, -1, 0.5, 0.9);
+    effect_desc_add_sphere_bounce(&effects, -1,  0,  1, 0.5, 0.9);
+    effect_desc_add_sphere_bounce(&effects, -1,  0, -1, 0.5, 0.9);
 
 
     effect_desc_add_newton_step (&effects);
