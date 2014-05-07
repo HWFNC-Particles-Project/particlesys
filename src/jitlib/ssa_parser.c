@@ -47,6 +47,7 @@ enum token_t {
 typedef struct {
     char *str;
     int i, begin;
+    float number;
     enum token_t current;
     int capacity, size;
     uint64_t *ssa_out;
@@ -128,7 +129,7 @@ enum token_t next_token(parser_state *parser) {
         return TOKEN_IDENTIFIER;
     } else if(isdigit(str[*i]) || str[*i] == '.') {
         char *end;
-        float number = strtof(str+*i, &end);
+        parser->number = strtof(str+*i, &end);
         *i = end-str;
         return TOKEN_NUMBER;
     } else if(str[*i] == '\0') {
@@ -236,7 +237,7 @@ int primary(parser_state *parser) {
         expect(parser, TOKEN_RPAREN);
         return value;
     } else if(peek(parser, TOKEN_NUMBER)) {
-        float f = strtof(parser->str+parser->begin,NULL);
+        float f = parser->number;
         int value = parser_append_ssa(parser, ssa_const(f));
         advance(parser);
         return value;
@@ -245,7 +246,7 @@ int primary(parser_state *parser) {
         expect(parser, TOKEN_RPAREN);
         return value;
     } else if(accept(parser, TOKEN_LBRACKET)) {
-        float f = strtof(parser->str+parser->begin,NULL);
+        float f = parser->number;
         int value = parser_append_ssa(parser, ssa_node(SSA_LOAD, f, 0, 0));
         expect(parser, TOKEN_NUMBER);
         expect(parser, TOKEN_RBRACKET);

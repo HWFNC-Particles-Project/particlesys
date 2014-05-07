@@ -11,6 +11,8 @@
 #include <jitlib/ssa_optimizer_passes.h>
 #include <jitlib/codegen.h>
 
+uint64_t nanotime();
+
 static struct {
     int parameters;
     char *source;
@@ -19,7 +21,8 @@ static struct {
         "dt = [8]\n"
         "[4] = [4] + [9]*dt\n"
         "[5] = [5] + [10]*dt\n"
-        "[6] = [6] + [11]*dt\n"},
+        "[6] = [6] + [11]*dt\n"
+        },
 
     [EFFECT_TYPE_LINEAR_FORCE]      = {4,
         "dt = [8]\n"
@@ -100,7 +103,9 @@ static struct {
         "dt = [8]\n"
         "[0] = [0] + dt*[4]\n"
         "[1] = [1] + dt*[5]\n"
-        "[2] = [2] + dt*[6]\n"},
+        "[2] = [2] + dt*[6]\n"
+        },
+
     [EFFECT_TYPE_GRAVITY_FORCE]     = {0, ""},
     [EFFECT_TYPE_SPHERE_COLLISION]  = {0, ""},
 };
@@ -128,11 +133,14 @@ int effect_program_create_jit(effect_program *p) {
     p->destroy = effect_program_jit_destroy;
     effect_program_jit *program = (p->usr = malloc(sizeof(effect_program_jit)));
 
+    uint64_t t0 = nanotime();
     for(int i = 0;i<EFFECT_TYPE_COUNT;++i) {
         program->effects[i].parameters = sources[i].parameters;
         program->effects[i].block = ssa_parse(sources[i].source);
     }
+    uint64_t t1 = nanotime();
 
+    fprintf(stderr, "parse:     %f\n", (t1-t0)*1.0e-6);
     program->const_input = NULL;
     program->fun = NULL;
 
@@ -174,18 +182,36 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
     }
 
 
-
+    uint64_t t0 = nanotime();
     ssa_fuse_load_store(&block);
-    ssa_fold_constants(&block);
-    ssa_remap_duplicates(&block);
-    ssa_mark_dead(&block);
-    ssa_resolve(&block);
+    uint64_t t1 = nanotime();
 
-    //~ ssa_schedule(&block, ivybridge);
+    ssa_fold_constants(&block);
+    uint64_t t2 = nanotime();
+
+    ssa_remap_duplicates(&block, 1024);
+    uint64_t t3 = nanotime();
+
+    ssa_mark_dead(&block);
+    uint64_t t4 = nanotime();
+
+    ssa_resolve(&block);
+    uint64_t t5 = nanotime();
+
+    ssa_schedule(&block, ivybridge);
+    uint64_t t6 = nanotime();
 
     program->fun = gencode_avx_ss(&block, 8);
+    uint64_t t7 = nanotime();
 
-    //~ ssa_print(&block);
+    fprintf(stderr, "fuse:      %f\n", (t1-t0)*1.0e-6);
+    fprintf(stderr, "fold:      %f\n", (t2-t1)*1.0e-6);
+    fprintf(stderr, "dedup:     %f\n", (t3-t2)*1.0e-6);
+    fprintf(stderr, "mark:      %f\n", (t4-t3)*1.0e-6);
+    fprintf(stderr, "resolve:   %f\n", (t5-t4)*1.0e-6);
+    fprintf(stderr, "schedule:  %f\n", (t6-t5)*1.0e-6);
+    fprintf(stderr, "generate:  %f\n", (t7-t6)*1.0e-6);
+
     //~ dump_code(program->fun);
 
     ssa_block_destroy(&block);

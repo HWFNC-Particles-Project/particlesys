@@ -21,6 +21,7 @@ enum ops_t {
 };
 
 #define DEAD_BIT (0x1000ull)
+#define FLAG_BITS (0xF000ull)
 #define OP_MASK (0x0FFFull)
 
 #define GET_OP(x) ((x)&OP_MASK)
@@ -65,8 +66,9 @@ uint64_t ssa_apply_offset(uint64_t op, uint64_t offset);
 uint64_t ssa_apply_remap_location(uint64_t op, const uint64_t *remap);
 void ssa_block_append(ssa_block *block, ssa_block *block2, const uint64_t *remap);
 void ssa_block_destroy(ssa_block *block);
-int ssa_compare_op(ssa_block *block, uint64_t a, uint64_t b);
+uint64_t ssa_canonicalize_op(ssa_block *block, uint64_t op);
 void ssa_apply_remap(ssa_block *block);
+void ssa_apply_remap_raw(ssa_block *block);
 void ssa_resolve(ssa_block *block);
 
 #endif
