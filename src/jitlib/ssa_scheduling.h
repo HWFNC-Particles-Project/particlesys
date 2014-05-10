@@ -1,7 +1,7 @@
 #ifndef SSA_SCHEDULING_H
 #define SSA_SCHEDULING_H
 
-#include <ssa_def.h>
+#include "ssa_def.h"
 
 static ssa_scheduling_info sandybridge[] = {
     [SSA_NONE]   = {0 ,0 ,0},

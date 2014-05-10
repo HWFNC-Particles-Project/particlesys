@@ -2,7 +2,7 @@
 #define CODEGEN_H
 
 #include <stdint.h>
-#include <ssa_def.h>
+#include "ssa_def.h"
 
 typedef struct {
     uint32_t chunksize;

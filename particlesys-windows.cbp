@@ -35,6 +35,7 @@
 			<Add option="-Wall" />
 			<Add option="-std=c99" />
 			<Add option="-DNO_VIS" />
+			<Add option="-DNO_PERF" />
 			<Add directory="$(#sdl.include)" />
 			<Add directory="$(#glew.include)" />
 			<Add directory="$(#mman_win32.include)" />
@@ -43,9 +44,11 @@
 		<Linker>
 			<Add library="SDL2main" />
 			<Add library="SDL2" />
+			<Add library="mman" />
 			<Add directory="$(#sdl.lib)" />
 			<Add directory="$(#glew.lib)" />
 			<Add directory="$(#glew.bin)" />
+			<Add directory="$(#mman_win32.lib)" />
 		</Linker>
 		<Unit filename="cb.bmp" />
 		<Unit filename="plasm/include/instruction_table.h" />

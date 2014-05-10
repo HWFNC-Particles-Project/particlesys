@@ -1,4 +1,4 @@
-#include <ssa_def.h>
+#include "ssa_def.h"
 #include <string.h>
 
 void ssa_block_load(ssa_block *block, uint64_t *code, size_t size) {

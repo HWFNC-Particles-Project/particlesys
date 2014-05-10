@@ -6,7 +6,7 @@
 #include <sys/mman.h>
 
 #include <plasm.h>
-#include <codegen.h>
+#include "codegen.h"
 
 static mnemonic_t ssa2asm_ss[] = {
     [SSA_NONE]   = UNKNOWN,
