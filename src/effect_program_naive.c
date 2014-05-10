@@ -215,14 +215,16 @@ void plane_bounce_apply(particle *p, void *data0, float dt) {
     float vnormal = data[0]*p->velocity[0] + data[1]*p->velocity[1] + data[2]*p->velocity[2];
     float d = data[3];
     if(dist<d && vnormal<0) {
+        // we are behind plane and velocity is away from the back of the plane
+        // invert normal components of velocity:
         p->velocity[0] -= 2.0f*vnormal*data[0];
         p->velocity[1] -= 2.0f*vnormal*data[1];
         p->velocity[2] -= 2.0f*vnormal*data[2];
-
+        // apply decay:
         p->velocity[0] *= data[4];
         p->velocity[1] *= data[4];
         p->velocity[2] *= data[4];
-
+        // move particle to the surface of the plane (works only when vector data[0..2] is normalized.
         p->position[0] += (d-dist)*data[0];
         p->position[1] += (d-dist)*data[1];
         p->position[2] += (d-dist)*data[2];
@@ -258,6 +260,7 @@ void sphere_bounce_apply(particle *p, void *data0, float dt) {
     float vnormal = normal[0]*p->velocity[0] + normal[1]*p->velocity[1] + normal[2]*p->velocity[2];
     float d = data[3];
     if(r<d && vnormal<0) {
+        // inside sphere and going further inside sphere:
         p->velocity[0] -= 2.0f*vnormal*normal[0];
         p->velocity[1] -= 2.0f*vnormal*normal[1];
         p->velocity[2] -= 2.0f*vnormal*normal[2];
@@ -290,18 +293,21 @@ void pairwise_gravitational_force_apply(particle *p1, particle *p2, void *data0,
     float *data = data0;
     float mu = data[0];
     float diff[3];
-    mu *= p1->mass*p2->mass;
+    float m1 = p1->mass;
+    float m2 = p2->mass;
+    mu *= m1*m2;
     diff[0] = p2->position[0]-p1->position[0];
     diff[1] = p2->position[1]-p1->position[1];
     diff[2] = p2->position[2]-p1->position[2];
     float r = sqrt(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
-    float r3 = 1.0f/(r*r*r);
-    p1->velocity[0] -= dt*mu*diff[0]*r3;
-    p1->velocity[1] -= dt*mu*diff[1]*r3;
-    p1->velocity[2] -= dt*mu*diff[2]*r3;
-    p2->velocity[0] += dt*mu*diff[0]*r3;
-    p2->velocity[1] += dt*mu*diff[1]*r3;
-    p2->velocity[2] += dt*mu*diff[2]*r3;
+    // is r^3 because we need to normalize diff.
+    mu = mu/(r*r*r);
+    p1->velocity[0] -= dt*diff[0]*mu/m1;
+    p1->velocity[1] -= dt*diff[1]*mu/m1;
+    p1->velocity[2] -= dt*diff[2]*mu/m1;
+    p2->velocity[0] += dt*diff[0]*mu/m2;
+    p2->velocity[1] += dt*diff[1]*mu/m2;
+    p2->velocity[2] += dt*diff[2]*mu/m2;
 }
 
 particle_effect_naive pairwise_gravitational_force_effect(float mu) {
@@ -328,14 +334,18 @@ void pairwise_sphere_collision_apply(particle *p1, particle *p2, void *data0, fl
     diff[2] *= 1.0f/r;
     float m1 = p1->mass;
     float m2 = p2->mass;
+    // project velocities onto diff vector:
     float u1 = p1->velocity[0]*diff[0] + p1->velocity[1]*diff[1] + p1->velocity[2]*diff[2];
     float u2 = p2->velocity[0]*diff[0] + p2->velocity[1]*diff[1] + p2->velocity[2]*diff[2];
 
     if(r<radius) {
+        // within collision range:
         if(u2<u1) {
-            float v1 = (u1*m1+u2*m2+restitution*m2*(u2-u1))/(m1+m2);
-            float v2 = (u2*m2+u1*m1+restitution*m1*(u1-u2))/(m1+m2);
-
+            // particles are approaching:
+            // calculate new velocities according to collision laws: (in the direction of diff)
+            float v1 = (u1*m1+u2*m2-restitution*m2*(u1-u2))/(m1+m2);
+            float v2 = (u2*m2+u1*m1-restitution*m1*(u2-u1))/(m1+m2);
+            // update velocities:
             p1->velocity[0] += (v1-u1)*diff[0];
             p1->velocity[1] += (v1-u1)*diff[1];
             p1->velocity[2] += (v1-u1)*diff[2];
@@ -343,7 +353,7 @@ void pairwise_sphere_collision_apply(particle *p1, particle *p2, void *data0, fl
             p2->velocity[1] += (v2-u2)*diff[1];
             p2->velocity[2] += (v2-u2)*diff[2];
         }
-
+        // move particles apart, such that they don't intersect (in the direction of diff)
         p1->position[0] -= 0.5f*(radius-r)*diff[0];
         p1->position[1] -= 0.5f*(radius-r)*diff[1];
         p1->position[2] -= 0.5f*(radius-r)*diff[2];
