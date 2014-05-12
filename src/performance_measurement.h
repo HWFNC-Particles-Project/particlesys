@@ -7,7 +7,7 @@
 #define NUM_PART (32*32)
 #define COST_LOW 26.5*NUM_PART*NUM_PART+47.0*NUM_PART
 #define COST_HIGH 39.0*NUM_PART*NUM_PART+92.0*NUM_PART
-#define NUM_ITER 10000
+#define NUM_ITER 1000
 
 int perf_measurement_init();
 

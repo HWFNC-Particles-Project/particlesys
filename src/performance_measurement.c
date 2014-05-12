@@ -18,6 +18,10 @@ void perf_print_measurement(perf_measure* pm) {
     (void) pm;
 }
 
+uint64_t nanotime() {
+    return 0;
+}
+
 #else
 #include <time.h>
 #include <sys/time.h>
