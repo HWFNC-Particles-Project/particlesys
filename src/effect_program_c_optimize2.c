@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include <xmmintrin.h>
+#include <smmintrin.h>
 #include "malloc_align.h"
 
 /*
@@ -252,8 +253,8 @@ static void print__m128(__m128 d) {
 static void gravitational_force_apply(particle *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
     __m128 dtv  = _mm_set_ps1(dt);
-    __m128 mu   = _mm_load_ps(&f_data[4]);
     __m128 cntr = _mm_load_ps(&f_data[0]);
+    __m128 mu   = _mm_load_ps(&f_data[4]);
     __m128 pp   = _mm_load_ps(&p->position[0]);
     __m128 v    = _mm_load_ps(&p->velocity[0]);
     //__m128 s15  = _mm_set1_ps(1.5f);
@@ -343,47 +344,46 @@ static particle_effect_c_o2 gravitational_force_effect(float x, float y, float z
 static void plane_bounce_apply(particle *p, const void *data0, float dt) {
     (void) dt;
     const float *f_data = (const float *)data0;
-    float a = f_data[0];
-    float b = f_data[1];
-    float c = f_data[2];
-    float d = f_data[3];
-    float dec = f_data[4];
-    float pp0 = p->position[0];
-    float pp1 = p->position[1];
-    float pp2 = p->position[2];
-    float pv0 = p->velocity[0];
-    float pv1 = p->velocity[1];
-    float pv2 = p->velocity[2];
-    float a_pp0 = a * pp0;
-    float b_pp1 = b * pp1;
-    float c_pp2 = c * pp2;
-    float d_a_pp0 = d - a_pp0;
-    float b_pp1_c_pp2 = b_pp1 + c_pp2;
-    float a_pv0 = a * pv0;
-    float b_pv1 = b * pv1;
-    float c_pv2 = c * pv2;
-    float a_pv0_b_pv1 = a_pv0 +  b_pv1;
-    float d_dist = d_a_pp0 - b_pp1_c_pp2;
-    float vnormal = a_pv0_b_pv1 + c_pv2;
-    //float dist = a_pp0 + b_pp1 + c_pp2;
-    if(d_dist > 0.0f && vnormal < 0.0f) {
+    __m128 z    = _mm_setzero_ps();
+    __m128 nv   = _mm_load_ps(&f_data[0]);
+    __m128 pp   = _mm_load_ps(&p->position[0]);
+    __m128 v    = _mm_load_ps(&p->velocity[0]);
+    __m128 pp1  = _mm_blend_ps(pp, _mm_set_ps1(-1.0f), 0b1000);
+    // multiply vectors:
+    __m128 pd   = _mm_mul_ps(pp1, nv);
+    __m128 vd   = _mm_mul_ps(v  , nv);
+    // horizontal add them:
+    __m128 vd_3 = _mm_movehl_ps(vd, vd); // 1 cycle     k       -> vd_3 = [vd[2]       xx          vd[2]       xx   ]
+    __m128 pd34 = _mm_movehl_ps(pd, pd); // 1 cycle     k       -> pd34 = [pd[2]       pd[3]       pd[2]       pd[3]]
+    __m128 vd_2 = _mm_shuffle_ps(vd, vd, 1);// 1 cycle          -> vd_2 = [vd[1]       vd[0]       vd[0]       vd[0]]
+    __m128 pd_1 = _mm_add_ps(pd,   pd34);// 3 cycles    k       -> pd_1 = [pd[0]+pd[2] pd[1]+pd[3] pd[2]       pd[3]]
+    __m128 vd_1 = _mm_add_ss(vd,   vd_3);// 3 cycles    k       -> vd_1 = [vd[0]+vd[2] vd[1]       vd[2]       xx   ]
+    __m128 pd_2 = _mm_shuffle_ps(pd_1, pd_1, 1);// 1 cycle      -> pd_2 = [pd[1]+pd[3] pd[0]+pd[2] pd[0]+pd[2] pd[0]+pd[2]]
+    __m128 ddst = _mm_add_ps(pd_2, pd_1);// 3 cycles    k       -> vnrm = [ddst        ddst        xx          xx   ]
+    __m128 vnrm = _mm_add_ss(vd_2, vd_1);// 3 cycles    k       -> vnrm = [vnrm        vd[0]       vd[0]       vd[0]]
+    
+    /*union {
+        __m128 i;
+        uint32_t f[4];
+    } brnch = {.i = _mm_and_ps(_mm_cmpgt_ss(z, ddst), _mm_cmpgt_ss(z, vnrm))};
+    
+    if(brnch.f[0]) {*/
+    float d_dist; float vnormal;
+    _mm_store_ss(&d_dist, ddst); _mm_store_ss(&vnormal, vnrm);
+    if (d_dist < 0.0f && vnormal < 0.0f) {
         // we are behind plane and velocity is away from the back of the plane
-        float vnormal_a = vnormal * a;
-        float vnormal_b = vnormal * b;
-        float vnormal_c = vnormal * c;
-        //float d_dist = d - dist;
-        float pv0_1 = pv0 - vnormal_a-vnormal_a;
-        float pv1_1 = pv1 - vnormal_b-vnormal_b;
-        float pv2_1 = pv2 - vnormal_c-vnormal_c;
-        float d_dist_a = d_dist * a;
-        float d_dist_b = d_dist * b;
-        float d_dist_c = d_dist * c;
-        p->position[0] = pp0 + d_dist_a;
-        p->position[1] = pp1 + d_dist_b;
-        p->position[2] = pp2 + d_dist_c;
-        p->velocity[0] = pv0_1 * dec;
-        p->velocity[1] = pv1_1 * dec;
-        p->velocity[2] = pv2_1 * dec;
+        __m128 nv_z   = _mm_blend_ps(nv, z, 0b1000);
+        __m128 ddst_a = _mm_movelh_ps(ddst, ddst);    // 1 cycle          -> ddst_a = [ddst ddst ddst ddst]
+        __m128 vnrm_a = _mm_shuffle_ps(vnrm, vnrm, 0);// 1 cycle          -> vnrm_a = [vnrm vnrm vnrm vnrm]
+        __m128 dec    = _mm_load_ps(&f_data[4]);
+        __m128 vnrm_n = _mm_mul_ps(vnrm_a, nv_z);
+        __m128 ddst_n = _mm_mul_ps(ddst_a, nv_z);
+        __m128 v_1    = _mm_sub_ps(v, vnrm_n);
+        __m128 v_2    = _mm_sub_ps(v_1, vnrm_n);
+        __m128 pp_1   = _mm_sub_ps(pp, ddst_n);
+        __m128 v_dec  = _mm_mul_ps(v_2, dec);
+        _mm_store_ps(&p->position[0], pp_1);
+        _mm_store_ps(&p->velocity[0], v_dec);
     }
 }
 
@@ -393,18 +393,18 @@ static void plane_bounce_perf_c(const particle *p, void *data0, float dt, perfor
     float dist =    data[0]*p->position[0] + data[1]*p->position[1] + data[2]*p->position[2];
     float vnormal = data[0]*p->velocity[0] + data[1]*p->velocity[1] + data[2]*p->velocity[2];
     float d = data[3];
-    out->add += 5;
-    out->mul += 6;
-    out->loads += 11;
+    out->add += 10;
+    out->mul += 8;
+    out->loads += 12;
     out->cmp += 1;
     if(dist<d) {
         out->cmp += 1;
         if (vnormal<0.0f) {
             // branch is taken:
-            out->add += 9;
-            out->mul += 9;
-            out->loads += 0;
-            out->stores += 6;
+            out->add += 12;
+            out->mul += 12;
+            out->loads += 4;
+            out->stores += 8;
         }
     } else {
         // branch not taken.
@@ -416,15 +416,17 @@ static particle_effect_c_o2 plane_bounce_effect(float x, float y, float z, float
     result.particles = 1;
     result.apply.one =  plane_bounce_apply;
     result.perf_c.one = plane_bounce_perf_c;
-    float *data = malloc(5*sizeof(float));
+    float *data = malloc_align(8*sizeof(float), 16, &result.p_to_free);
     float r = sqrtf(x*x + y*y + z*z);
     data[0] = x/r;
     data[1] = y/r;
     data[2] = z/r;
     data[3] = d/r;
     data[4] = a;
+    data[5] = a;
+    data[6] = a;
+    data[7] = 1;
     result.userdata = data;
-    result.p_to_free = data;
     return result;
 }
 

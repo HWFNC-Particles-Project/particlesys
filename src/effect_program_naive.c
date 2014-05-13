@@ -264,7 +264,7 @@ static void plane_bounce_apply(particle *p, void *data0, float dt) {
     float dist =    data[0]*p->position[0] + data[1]*p->position[1] + data[2]*p->position[2];
     float vnormal = data[0]*p->velocity[0] + data[1]*p->velocity[1] + data[2]*p->velocity[2];
     float d = data[3];
-    if(dist<d && vnormal<0.0f) {
+    if(0.0f<d-dist && vnormal<0.0f) {
         // we are behind plane and velocity is away from the back of the plane
         // invert normal components of velocity:
         p->velocity[0] -= 2.0f*vnormal*data[0];

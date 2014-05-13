@@ -123,7 +123,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 0:
             // linear accel:
             particle_array_create(arr);
-            //return 1;
+            return 1;
             *out_description = "linear acceleration";
             effect_desc_add_linear_accel(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
             add_random_particles(arr, 1024);
@@ -132,7 +132,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 1:
             // linear force:
             particle_array_create(arr);
-            //return 1;
+            return 1;
             *out_description = "linear force";
             effect_desc_add_linear_force(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
             add_random_particles(arr, 1024);
@@ -141,7 +141,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 2: {
                 // central force:
                 particle_array_create(arr);
-                //return 1;
+                return 1;
                 *out_description = "central force";
                 float cf_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1)};
                 effect_desc_add_central_force(effects,  cf_data[0], cf_data[1], cf_data[2], randf(0,1));
@@ -152,7 +152,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 3:
         case 4: {
                 particle_array_create(arr);
-                return 1;
+                //return 1;
                 if (test_case == 3) {
                     *out_description = "plane bounce, all particles in front";
                 } else if (test_case == 4) {
