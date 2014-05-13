@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <limits.h>
 
-#include <ssa_def.h>
-#include <ssa_print.h>
+#include "ssa_def.h"
+#include "ssa_print.h"
 #include <stdlib.h>
 #include <math.h>
 

@@ -1,7 +1,7 @@
 #ifndef SSA_OPTIMIZER_PASSES_H
 #define SSA_OPTIMIZER_PASSES_H
 
-#include <ssa_def.h>
+#include "ssa_def.h"
 
 void ssa_mark_dead(ssa_block *block);
 void ssa_remap_duplicates(ssa_block *block, size_t window);

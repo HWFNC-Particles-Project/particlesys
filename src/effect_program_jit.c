@@ -4,12 +4,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <jitlib/ssa_def.h>
-#include <jitlib/ssa_scheduling.h>
-#include <jitlib/ssa_parser.h>
-#include <jitlib/ssa_print.h>
-#include <jitlib/ssa_optimizer_passes.h>
-#include <jitlib/codegen.h>
+#include "jitlib/ssa_def.h"
+#include "jitlib/ssa_scheduling.h"
+#include "jitlib/ssa_parser.h"
+#include "jitlib/ssa_print.h"
+#include "jitlib/ssa_optimizer_passes.h"
+#include "jitlib/codegen.h"
 
 uint64_t nanotime();
 

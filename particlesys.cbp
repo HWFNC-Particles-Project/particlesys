@@ -37,6 +37,8 @@
 			<Add option="-DNO_VIS" />
 			<Add directory="$(#sdl.include)" />
 			<Add directory="$(#glew.include)" />
+			<Add directory="$(#mman_win32.include)" />
+			<Add directory="plasm/include" />
 		</Compiler>
 		<Linker>
 			<Add library="SDL2main" />
@@ -46,6 +48,12 @@
 			<Add directory="$(#glew.bin)" />
 		</Linker>
 		<Unit filename="cb.bmp" />
+		<Unit filename="plasm/include/instruction_table.h" />
+		<Unit filename="plasm/include/mnemonics.h" />
+		<Unit filename="plasm/include/plasm.h" />
+		<Unit filename="plasm/src/plasm.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="src/effect_desc.c">
 			<Option compilerVar="CC" />
 		</Unit>
@@ -54,16 +62,45 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="src/effect_program.h" />
+		<Unit filename="src/effect_program_jit.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/effect_program_jit.h" />
 		<Unit filename="src/effect_program_naive.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="src/effect_program_naive.h" />
-		<Unit filename="src/ftimer.c">
+		<Unit filename="src/jitlib/codegen.c">
 			<Option compilerVar="CC" />
-			<Option compile="0" />
-			<Option link="0" />
 		</Unit>
-		<Unit filename="src/ftimer.h" />
+		<Unit filename="src/jitlib/codegen.h" />
+		<Unit filename="src/jitlib/codegen_avx_ps.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/jitlib/codegen_avx_ss.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/jitlib/hash_table.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/jitlib/hash_table.h" />
+		<Unit filename="src/jitlib/ssa_def.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/jitlib/ssa_def.h" />
+		<Unit filename="src/jitlib/ssa_optimizer_passes.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/jitlib/ssa_optimizer_passes.h" />
+		<Unit filename="src/jitlib/ssa_parser.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/jitlib/ssa_parser.h" />
+		<Unit filename="src/jitlib/ssa_print.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/jitlib/ssa_print.h" />
+		<Unit filename="src/jitlib/ssa_scheduling.h" />
 		<Unit filename="src/main.c">
 			<Option compilerVar="CC" />
 		</Unit>

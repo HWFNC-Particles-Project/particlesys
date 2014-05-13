@@ -5,7 +5,7 @@
 
 #include <sys/mman.h>
 
-#include <codegen.h>
+#include "codegen.h"
 
 void free_code(void *fun) {
     if(fun != NULL) {

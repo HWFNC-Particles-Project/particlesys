@@ -1,11 +1,11 @@
 
-#include <ssa_def.h>
+#include "ssa_def.h"
 #include <setjmp.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
-#include <hash_table.h>
+#include "hash_table.h"
 
 void skip_space(char *str, int *i) {
     while(isspace(str[*i])) ++*i;
