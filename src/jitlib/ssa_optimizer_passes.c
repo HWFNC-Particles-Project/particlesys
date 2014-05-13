@@ -75,16 +75,6 @@ void ssa_remap_duplicates(ssa_block *block, size_t window) {
             hash_map[index] = i1;
         }
     }
-    //~ for(size_t i = 0;i<block->size;++i) {
-        //~ size_t j = i>window?i-window:0;
-        //~ for(;j<i;++j) {
-            //~ size_t i1 = ssa_get_index(block, i);
-            //~ size_t j1 = ssa_get_index(block, j);
-            //~ if(ssa_canonicalize_op(block, block->buffer[i1]) == ssa_canonicalize_op(block, block->buffer[j1])) {
-                //~ ssa_remap_index(block, i1, j1);
-            //~ }
-        //~ }
-    //~ }
 }
 
 void ssa_fuse_load_store(ssa_block *block) {

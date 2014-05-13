@@ -60,7 +60,6 @@ typedef struct {
 void ssa_block_load(ssa_block *block, uint64_t *code, size_t size);
 uint64_t ssa_get_index(ssa_block *block, uint64_t i);
 void ssa_remap_index(ssa_block *block, uint64_t i, uint64_t j);
-void ssa_remap_index_raw(ssa_block *block, uint64_t i, uint64_t j);
 void ssa_block_reserve(ssa_block *block, size_t capacity);
 uint64_t ssa_apply_offset(uint64_t op, uint64_t offset);
 uint64_t ssa_apply_remap_location(uint64_t op, const uint64_t *remap);
