@@ -31,7 +31,7 @@ int particle_array_copy(particle_array *array, const particle_array *src) {
     return 0;
 }
 
-int particle_array_compare(particle_array *arr1, particle_array *arr2, float eps) {
+int particle_array_compare(particle_array *arr1, particle_array *arr2, float rel_eps) {
     size_t i;
     if      (arr1->size > arr2->size) return 1;
     else if (arr1->size < arr2->size) return -1;
@@ -42,11 +42,16 @@ int particle_array_compare(particle_array *arr1, particle_array *arr2, float eps
         // compare each component:
         for (j = 0; j < sizeof(particle) / sizeof(float); ++j) {
             float d = arr1->particles[i].array[j] - arr2->particles[i].array[j];
+            float mean = (arr1->particles[i].array[j] + arr2->particles[i].array[j]) / 2.0;
+            float d_rel = d;
+            if (mean != 0.0f) {
+                d_rel = d / mean;
+            }
             // with tolerance eps:
-            if (d > eps) {
+            if (d_rel > rel_eps) {
                 fprintf(stderr, "[particle_array_compare] error: particle %d is different (component %d, delta %g)\n", (int)i, (int)j, (double)d);
                 return 1;
-            } else if (d < -eps) {
+            } else if (d_rel < -rel_eps) {
                 fprintf(stderr, "[particle_array_compare] error: particle %d is different (component %d, delta %g)\n", (int)i, (int)j, (double)d);
                 return -1;
             }

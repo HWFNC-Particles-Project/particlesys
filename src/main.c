@@ -80,7 +80,7 @@ void test_performance(const effect_program *test_program, const particle_array *
 }
 
 void verify(const effect_program *test_program, const effect_program *ref_program, const particle_array *initial_arr) {
-    int iterations = 100;
+    int iterations = 50;
     particle_array test_arr;
     particle_array ref_arr;
     particle_array_create(&test_arr);
@@ -97,7 +97,7 @@ void verify(const effect_program *test_program, const effect_program *ref_progra
             fprintf(stderr, "iteration %d\n", (int)i);
             break;
         }
-        if(i%50==0){printf("%d-th iteration\n",i);}
+        //if(i%50==0){printf("%d-th iteration\n",i);}
     }
     particle_array_destroy(&test_arr);
     particle_array_destroy(&ref_arr);

@@ -307,24 +307,27 @@ static void plane_bounce_apply(particle *p, const void *data0, float dt) {
     float b = f_data[1];
     float c = f_data[2];
     float d = f_data[3];
-    float pv0 = p->velocity[0];
-    float pv1 = p->velocity[1];
-    float pv2 = p->velocity[2];
+    float dec = f_data[4];
     float pp0 = p->position[0];
     float pp1 = p->position[1];
     float pp2 = p->position[2];
-    float a_pv0 = a * pv0;
-    float b_pv1 = b * pv1;
-    float c_pv2 = c * pv2;
+    float pv0 = p->velocity[0];
+    float pv1 = p->velocity[1];
+    float pv2 = p->velocity[2];
     float a_pp0 = a * pp0;
     float b_pp1 = b * pp1;
     float c_pp2 = c * pp2;
-    float d_dist = (d - a_pp0) - (b_pp1 + c_pp2);
+    float d_a_pp0 = d - a_pp0;
+    float b_pp1_c_pp2 = b_pp1 + c_pp2;
+    float a_pv0 = a * pv0;
+    float b_pv1 = b * pv1;
+    float c_pv2 = c * pv2;
+    float a_pv0_b_pv1 = a_pv0 +  b_pv1;
+    float d_dist = d_a_pp0 - b_pp1_c_pp2;
+    float vnormal = a_pv0_b_pv1 + c_pv2;
     //float dist = a_pp0 + b_pp1 + c_pp2;
-    float vnormal = a_pv0 +  b_pv1 + c_pv2;
-    if((d_dist > 0.0f) & (vnormal < 0.0f)) {
+    if(d_dist > 0.0f && vnormal < 0.0f) {
         // we are behind plane and velocity is away from the back of the plane
-        float dec = f_data[4];
         float vnormal_a = vnormal * a;
         float vnormal_b = vnormal * b;
         float vnormal_c = vnormal * c;
@@ -352,14 +355,15 @@ static void plane_bounce_perf_c(const particle *p, void *data0, float dt, perfor
     float d = data[3];
     out->add += 5;
     out->mul += 6;
-    out->loads += 10;
-    out->cmp += 2;
+    out->loads += 11;
+    out->cmp += 1;
     if(dist<d) {
+        out->cmp += 1;
         if (vnormal<0.0f) {
             // branch is taken:
-            out->add += 6;
+            out->add += 9;
             out->mul += 9;
-            out->loads += 1;
+            out->loads += 0;
             out->stores += 6;
         }
     } else {
@@ -390,30 +394,31 @@ static void sphere_bounce_apply(particle *p, const void *data0, float dt) {
     float fd1 = f_data[1];
     float fd2 = f_data[2];
     float d   = f_data[3];
+    float dec = f_data[4];
     float pp0 = p->position[0];
     float pp1 = p->position[1];
     float pp2 = p->position[2];
     float pv0 = p->velocity[0];
     float pv1 = p->velocity[1];
     float pv2 = p->velocity[2];
+    float d2 = d * d;
     float n0  = pp0-fd0;
     float n1  = pp1-fd1;
     float n2  = pp2-fd2;
-    float d2 = d * d;
     float r2 = n0*n0 + n1*n1 + n2*n2;
     float vnormal = n0*pv0 + n1*pv1 + n2*pv2;
+    float r2_reci = 1.0f / r2;
     if(d2 > r2 && vnormal < 0.0f) {
         // inside sphere and going further inside sphere:
-        float dec = f_data[4];
-        float r = sqrtf(r2);
+        float r_reci = sqrtf(r2_reci);
         
-        float vnormal2_r2 = 2.0f * vnormal / r2;
-        
-        float d_r_r_reci = d / r - 1.0f;
+        float vnormal2_r2 = 2.0f * vnormal * r2_reci;
         
         float pv0_1 = pv0 - vnormal2_r2*n0;
         float pv1_1 = pv1 - vnormal2_r2*n1;
         float pv2_1 = pv2 - vnormal2_r2*n2;
+        
+        float d_r_r_reci = d * r_reci - 1.0f;
 
         p->velocity[0] = pv0_1 * dec;
         p->velocity[1] = pv1_1 * dec;
@@ -440,17 +445,16 @@ static void sphere_bounce_perf_c(const particle *p, void *data0, float dt, perfo
     float d = data[3];
     out->add += 7;
     out->mul += 7;
-    out->loads += 10;
+    out->div += 1;
+    out->loads += 11;
     out->cmp += 1;
     if(r<d) {
         out->cmp += 1;
         if (vnormal<0.0f) {
             // branch is taken:
-            out->loads += 1;
             out->add += 7;
-            out->div += 2;
             out->sqrt += 1;
-            out->mul += 10;
+            out->mul += 12;
             out->stores += 6;
         }
     } else {
@@ -468,6 +472,7 @@ static particle_effect_c_o1 sphere_bounce_effect(float x, float y, float z, floa
     data[1] = y;
     data[2] = z;
     data[3] = r;
+    //data[4] = r * r;
     data[4] = a;
     result.userdata = data;
     return result;
@@ -476,29 +481,52 @@ static particle_effect_c_o1 sphere_bounce_effect(float x, float y, float z, floa
 static void pairwise_gravitational_force_apply(particle *p1, particle *p2, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
     float mu = f_data[0];
-    float diff[3];
+    float pp10 = p1->position[0];
+    float pp11 = p1->position[1];
+    float pp12 = p1->position[2];
+    float pp20 = p2->position[0];
+    float pp21 = p2->position[1];
+    float pp22 = p2->position[2];
+    float pv10 = p1->velocity[0];
+    float pv11 = p1->velocity[1];
+    float pv12 = p1->velocity[2];
+    float pv20 = p2->velocity[0];
+    float pv21 = p2->velocity[1];
+    float pv22 = p2->velocity[2];
     float m1 = p1->mass;
     float m2 = p2->mass;
-    diff[0] = p2->position[0]-p1->position[0];
-    diff[1] = p2->position[1]-p1->position[1];
-    diff[2] = p2->position[2]-p1->position[2];
-    float r2 = diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2];
+    float dt_mu = dt * mu;
+    float d0 = pp20-pp10;
+    float d1 = pp21-pp11;
+    float d2 = pp22-pp12;
+    float r2 = d0*d0 + d1*d1 + d2*d2;
+    float r4 = r2 * r2;
     float r = sqrt(r2);
     // is r^3 because we need to normalize diff.
-    mu = dt*mu/(r2*r);
-    p1->velocity[0] -= diff[0]*mu*m2;
-    p1->velocity[1] -= diff[1]*mu*m2;
-    p1->velocity[2] -= diff[2]*mu*m2;
-    p2->velocity[0] += diff[0]*mu*m1;
-    p2->velocity[1] += diff[1]*mu*m1;
-    p2->velocity[2] += diff[2]*mu*m1;
+    float mu_0 = dt_mu / r4;
+    float mu_1 = mu_0 * r;
+    float mu_m2 = mu_1 * m2;
+    float mu_m1 = mu_1 * m1;
+    float d0_1 = d0 * mu_m2;
+    float d1_1 = d1 * mu_m2;
+    float d2_1 = d2 * mu_m2;
+    float d0_2 = d0 * mu_m1;
+    float d1_2 = d1 * mu_m1;
+    float d2_2 = d2 * mu_m1;
+    p1->velocity[0] = pv10 - d0_1;
+    p1->velocity[1] = pv11 - d1_1;
+    p1->velocity[2] = pv12 - d2_1;
+    p2->velocity[0] = pv20 + d0_2;
+    p2->velocity[1] = pv21 + d1_2;
+    p2->velocity[2] = pv22 + d2_2;
 }
 
 static void pairwise_gravitational_force_perf_c(const particle *p1, const particle *p2, void *data0, float dt, performance_count *out) {
     (void) p1; (void) p2; (void) data0; (void) dt;
     out->add += 11;
-    out->mul += 19;
-    out->div += 7;
+    out->mul += 14;
+    out->div += 1;
+    out->sqrt += 1;
     out->loads += 15;
     out->stores += 6;
 }

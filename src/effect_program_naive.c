@@ -328,7 +328,7 @@ static void sphere_bounce_apply(particle *p, void *data0, float dt) {
     normal[0] = p->position[0]-data[0];
     normal[1] = p->position[1]-data[1];
     normal[2] = p->position[2]-data[2];
-    double r = sqrtf(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
+    float r = sqrtf(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
     normal[0] /= r;
     normal[1] /= r;
     normal[2] /= r;
@@ -424,6 +424,7 @@ static void pairwise_gravitational_force_perf_c(const particle *p1, const partic
     out->add += 11;
     out->mul += 19;
     out->div += 7;
+    out->sqrt += 1;
     out->loads += 15;
     out->stores += 6;
 }
