@@ -227,7 +227,7 @@ static void gravitational_force_apply(particle *p, void *data0, float dt) {
     diff[0] = p->position[0]-data[0];
     diff[1] = p->position[1]-data[1];
     diff[2] = p->position[2]-data[2];
-    float r = sqrt(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
+    float r = sqrtf(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
     float r3 = 1.0f/(r*r*r);
     p->velocity[0] += dt*mu*diff[0]*r3;
     p->velocity[1] += dt*mu*diff[1]*r3;
@@ -408,7 +408,7 @@ static void pairwise_gravitational_force_apply(particle *p1, particle *p2, void 
     diff[0] = p2->position[0]-p1->position[0];
     diff[1] = p2->position[1]-p1->position[1];
     diff[2] = p2->position[2]-p1->position[2];
-    float r = sqrt(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
+    float r = sqrtf(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
     // is r^3 because we need to normalize diff.
     mu = mu/(r*r*r);
     p1->velocity[0] -= dt*diff[0]*mu/m1;
@@ -448,7 +448,7 @@ static void pairwise_sphere_collision_apply(particle *p1, particle *p2, void *da
     diff[0] = p2->position[0]-p1->position[0];
     diff[1] = p2->position[1]-p1->position[1];
     diff[2] = p2->position[2]-p1->position[2];
-    float r = sqrt(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
+    float r = sqrtf(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
     diff[0] *= 1.0f/r;
     diff[1] *= 1.0f/r;
     diff[2] *= 1.0f/r;
@@ -492,7 +492,7 @@ static void pairwise_sphere_collision_perf_c(const particle *p1, const particle 
     diff[0] = p2->position[0]-p1->position[0];
     diff[1] = p2->position[1]-p1->position[1];
     diff[2] = p2->position[2]-p1->position[2];
-    float r = sqrt(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
+    float r = sqrtf(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
     diff[0] *= 1.0f/r;
     diff[1] *= 1.0f/r;
     diff[2] *= 1.0f/r;

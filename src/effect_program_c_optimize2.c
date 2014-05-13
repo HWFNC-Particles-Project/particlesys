@@ -2,12 +2,16 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+
+#include <xmmintrin.h>
+#include "malloc_align.h"
 
 /*
  * particle effects consists of a function (apply) and userdata for
  * effect specific data that is passed as second function to apply
  */
-typedef struct particle_effect_c_o1_t {
+typedef struct particle_effect_c_o2_t {
     int particles;
     union {
         void (*one)(particle *, const void *, float);
@@ -18,22 +22,23 @@ typedef struct particle_effect_c_o1_t {
         void (*two)(const particle *, const particle *, void *, float, performance_count *out);
     } perf_c;
     void *userdata;
-} particle_effect_c_o1;
+    void *p_to_free;
+} particle_effect_c_o2;
 
 
-void effect_program_c_o1_compile(effect_program *self, const effect_desc *desc);
-void effect_program_c_o1_execute(const effect_program *self, particle_array *arr, float dt);
-void effect_program_c_o1_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out);
-void effect_program_c_o1_destroy(effect_program *self);
+void effect_program_c_o2_compile(effect_program *self, const effect_desc *desc);
+void effect_program_c_o2_execute(const effect_program *self, particle_array *arr, float dt);
+void effect_program_c_o2_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out);
+void effect_program_c_o2_destroy(effect_program *self);
 
-static particle_effect_c_o1 linear_accel_effect(float x, float y, float z);
-static particle_effect_c_o1 linear_force_effect(float x, float y, float z);
-static particle_effect_c_o1 gravitational_force_effect(float x, float y, float z, float mu);
-static particle_effect_c_o1 plane_bounce_effect(float x, float y, float z, float d, float a);
-static particle_effect_c_o1 sphere_bounce_effect(float x, float y, float z, float r, float a);
-static particle_effect_c_o1 pairwise_gravitational_force_effect(float mu);
-static particle_effect_c_o1 pairwise_sphere_collision_effect(float radius, float restitution);
-static particle_effect_c_o1 newton_step_effect();
+static particle_effect_c_o2 linear_accel_effect(float x, float y, float z);
+static particle_effect_c_o2 linear_force_effect(float x, float y, float z);
+static particle_effect_c_o2 gravitational_force_effect(float x, float y, float z, float mu);
+static particle_effect_c_o2 plane_bounce_effect(float x, float y, float z, float d, float a);
+static particle_effect_c_o2 sphere_bounce_effect(float x, float y, float z, float r, float a);
+static particle_effect_c_o2 pairwise_gravitational_force_effect(float mu);
+static particle_effect_c_o2 pairwise_sphere_collision_effect(float radius, float restitution);
+static particle_effect_c_o2 newton_step_effect();
 
 static void linear_accel_apply(particle *p, const void *data0, float dt);
 static void linear_force_apply(particle *p, const void *data0, float dt);
@@ -44,23 +49,23 @@ static void newton_step_apply(particle *p, const void *data0, float dt);
 
 
 
-int effect_program_create_c_optimze1(effect_program *p) {
+int effect_program_create_c_optimze2(effect_program *p) {
     memset(p, 0, sizeof(effect_program));
-    p->compile = effect_program_c_o1_compile;
-    p->execute = effect_program_c_o1_execute;
-    p->perf_c  = effect_program_c_o1_perf_c;
-    p->destroy = effect_program_c_o1_destroy;
+    p->compile = effect_program_c_o2_compile;
+    p->execute = effect_program_c_o2_execute;
+    p->perf_c  = effect_program_c_o2_perf_c;
+    p->destroy = effect_program_c_o2_destroy;
     p->usr = NULL;
     return 0;
 }
 
-void effect_program_c_o1_destroy(effect_program *self) {
+void effect_program_c_o2_destroy(effect_program *self) {
     if (self->usr != NULL) {
         // free last compilation result:
-        particle_effect_c_o1 *effects = (particle_effect_c_o1 *)self->usr;
+        particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
-            if (effects[j].userdata != NULL) {
-                free(effects[j].userdata);
+            if (effects[j].p_to_free != NULL) {
+                free(effects[j].p_to_free);
             }
         }
         free(self->usr);
@@ -68,14 +73,14 @@ void effect_program_c_o1_destroy(effect_program *self) {
     }
 }
 
-void effect_program_c_o1_compile(effect_program *self, const effect_desc *desc) {
+void effect_program_c_o2_compile(effect_program *self, const effect_desc *desc) {
     if (self->usr != NULL) {
-        effect_program_c_o1_destroy(self);
+        effect_program_c_o2_destroy(self);
     }
     // compile ...
     size_t count = desc->size;
-    self->usr = malloc((count + 1) * sizeof(particle_effect_c_o1));
-    particle_effect_c_o1 *effects = (particle_effect_c_o1 *)self->usr;
+    self->usr = malloc((count + 1) * sizeof(particle_effect_c_o2));
+    particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
     for(size_t i = 0; i < count; ++i) {
         const effect_desc_ele *el = &desc->elements[i];
         switch(el->type) {
@@ -129,12 +134,12 @@ void effect_program_c_o1_compile(effect_program *self, const effect_desc *desc) 
     effects[count].userdata = NULL;
 }
 
-void effect_program_c_o1_execute(const effect_program *self, particle_array *arr, float dt) {
+void effect_program_c_o2_execute(const effect_program *self, particle_array *arr, float dt) {
     if (self->usr == NULL) {
         // fail, no compilation result.
         return;
     }
-    particle_effect_c_o1 *effects = (particle_effect_c_o1 *)self->usr;
+    particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
     for(size_t i = 0; i < arr->size; ++i) {
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if(effects[j].particles == 1) {
@@ -148,14 +153,14 @@ void effect_program_c_o1_execute(const effect_program *self, particle_array *arr
     }
 }
 
-void effect_program_c_o1_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out) {
+void effect_program_c_o2_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out) {
     // set all counters to zero:
     memset(out, 0, sizeof(*out));
     if (self->usr == NULL) {
         // fail, no compilation result.
         return;
     }
-    particle_effect_c_o1 *effects = (particle_effect_c_o1 *)self->usr;
+    particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
     for(size_t i = 0; i < arr->size; ++i) {
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if(effects[j].particles == 1) {
@@ -173,131 +178,165 @@ void effect_program_c_o1_perf_c(const effect_program *self, const particle_array
 
 static void linear_accel_apply(particle *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
-    float fd0 = f_data[0];
-    float fd1 = f_data[1];
-    float fd2 = f_data[2];
-    float pv0 = p->velocity[0];
-    float pv1 = p->velocity[1];
-    float pv2 = p->velocity[2];
-    float fd0_dt = dt * fd0;
-    float fd1_dt = dt * fd1;
-    float fd2_dt = dt * fd2;
-    p->velocity[0] = pv0 + fd0_dt;
-    p->velocity[1] = pv1 + fd1_dt;
-    p->velocity[2] = pv2 + fd2_dt;
+    __m128 dtv  = _mm_set_ps1(dt);
+    __m128 a    = _mm_load_ps(&f_data[0]);
+    __m128 v    = _mm_load_ps(&p->velocity[0]);
+    __m128 dt_a = _mm_mul_ps(dtv, a);
+    __m128 v_1  = _mm_add_ps(v, dt_a);
+    _mm_store_ps(&p->velocity[0], v_1);
 }
 
 static void linear_accel_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += 3;
-    out->mul += 3;
-    out->loads += 6;
-    out->stores += 3;
+    out->add += 4;
+    out->mul += 4;
+    out->loads += 8;
+    out->stores += 4;
 }
 
-static particle_effect_c_o1 linear_accel_effect(float x, float y, float z) {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 linear_accel_effect(float x, float y, float z) {
+    particle_effect_c_o2 result;
     result.particles = 1;
     result.apply.one  = linear_accel_apply;
     result.perf_c.one = linear_accel_perf_c;
-    float *data = malloc(3*sizeof(float));
+    float *data = malloc_align(4*sizeof(float), 16, &result.p_to_free);
     data[0] = x;
     data[1] = y;
     data[2] = z;
+    data[3] = 0;
     result.userdata = data;
     return result;
 }
 
 static void linear_force_apply(particle *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
-    float m = p->mass;
-    float k = dt / m;
-    float fd0 = f_data[0];
-    float fd1 = f_data[1];
-    float fd2 = f_data[2];
-    float pv0 = p->velocity[0];
-    float pv1 = p->velocity[1];
-    float pv2 = p->velocity[2];
-    float fd0_k = k * fd0;
-    float fd1_k = k * fd1;
-    float fd2_k = k * fd2;
-    p->velocity[0] = pv0 + fd0_k;
-    p->velocity[1] = pv1 + fd1_k;
-    p->velocity[2] = pv2 + fd2_k;
+    __m128 dtv  = _mm_set_ps1(dt);
+    __m128 m    = _mm_load_ps1(&p->mass);
+    __m128 f    = _mm_load_ps(&f_data[0]);
+    __m128 v    = _mm_load_ps(&p->velocity[0]);
+    __m128 dt_m = _mm_div_ps(dtv, m);
+    __m128 vd   = _mm_mul_ps(dt_m, f);
+    __m128 v_1  = _mm_add_ps(v, vd);
+    _mm_store_ps(&p->velocity[0], v_1);
 }
 
 static void linear_force_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += 3;
-    out->mul += 3;
-    out->div += 1;
-    out->loads += 7;
-    out->stores += 3;
+    out->add += 4;
+    out->mul += 4;
+    out->div += 4;
+    out->loads += 9;
+    out->stores += 4;
 }
 
-static particle_effect_c_o1 linear_force_effect(float x, float y, float z) {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 linear_force_effect(float x, float y, float z) {
+    particle_effect_c_o2 result;
     result.particles = 1;
     result.apply.one  = linear_force_apply;
     result.perf_c.one = linear_force_perf_c;
-    float *data = malloc(3*sizeof(float));
+    float *data = malloc_align(4*sizeof(float), 16, &result.p_to_free);
     data[0] = x;
     data[1] = y;
     data[2] = z;
+    data[3] = 0;
     result.userdata = data;
     return result;
 }
 
+static void print__m128(__m128 d) {
+    float data[4];
+    _mm_storeu_ps(data, d);
+    printf("%12.4e, %12.4e, %12.4e, %12.4e\n", data[0], data[1], data[2], data[3]);
+}
+
 static void gravitational_force_apply(particle *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
-    float fd0 = f_data[0];
-    float fd1 = f_data[1];
-    float fd2 = f_data[2];
-    float mu = f_data[3];
-    float pp0 = p->position[0];
-    float pp1 = p->position[1];
-    float pp2 = p->position[2];
-    float pv0 = p->velocity[0];
-    float pv1 = p->velocity[1];
-    float pv2 = p->velocity[2];
-    float dt_mu = dt * mu;
-    float d0 = pp0-fd0;
-    float d1 = pp1-fd1;
-    float d2 = pp2-fd2;
-    float r2 = d0*d0 + d1*d1 + d2*d2;
-    float r4 = r2 * r2;
-    float r = sqrtf(r2);
-    float k_1 = dt_mu / r4;
-    float k_2 = k_1 * r;
-    float d0_k = k_2 * d0;
-    float d1_k = k_2 * d1;
-    float d2_k = k_2 * d2;
-    p->velocity[0] = pv0 + d0_k;
-    p->velocity[1] = pv1 + d1_k;
-    p->velocity[2] = pv2 + d2_k;
+    __m128 dtv  = _mm_set_ps1(dt);
+    __m128 mu   = _mm_load_ps(&f_data[4]);
+    __m128 cntr = _mm_load_ps(&f_data[0]);
+    __m128 pp   = _mm_load_ps(&p->position[0]);
+    __m128 v    = _mm_load_ps(&p->velocity[0]);
+    //__m128 s15  = _mm_set1_ps(1.5f);
+    //__m128 s05  = _mm_set1_ps(-0.5f);
+    //__m128 z    = _mm_setzero_ps();      // 1 cycle
+    __m128 d    = _mm_sub_ps(pp, cntr);  // 3 cycles    k       -> d = pp - cntr
+    __m128 d2   = _mm_mul_ps(d, d);      // 5 cycles    k       -> d2 = d * d
+    __m128 mu_dt= _mm_mul_ps(mu, dtv);   // 5 cycles
+    __m128 d2_3 = _mm_movehl_ps(d2, d2); // 1 cycle     k       -> d2_3 = [d2[2]       xx    d2[2] xx   ]
+    __m128 d2_2 = _mm_shuffle_ps(d2, d2, 1);// 1 cycle          -> d2_2 = [d2[1]       d2[0] d2[0] d2[0]]
+    __m128 d2_1 = _mm_add_ss(d2,   d2_3);// 3 cycles    k       -> d2_1 = [d2[0]+d2[2] d2[1] d2[2] xx   ]
+    __m128 r2   = _mm_add_ss(d2_2, d2_1);// 3 cycles    k       -> r2   = [r2          d2[0] d2[0] d2[0]]
+    __m128 d_mu_dt= _mm_mul_ps(d, mu_dt);// 5 cycles
+    __m128 r2_a = _mm_shuffle_ps(r2, r2, 0);// 1 cycle          -> r2_a = [r2 r2 r2 r2]
+    
+    __m128 r    = _mm_sqrt_ps(r2_a);     // 20 cycles   k
+    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles    i
+    // reciprocal with one newton step for accuracy:
+    __m128 r4_ra= _mm_rcp_ps(r4);        // 3 cycles    i
+    __m128 r4_r2= _mm_add_ps(r4_ra, r4_ra);// 3 cycles
+    __m128 r8_ra= _mm_mul_ps(r4_ra, r4_ra);// 5 cycles  i
+    __m128 r4_r0= _mm_mul_ps(r8_ra, r4);   // 5 cycles  i
+    __m128 r4_r = _mm_sub_ps(r4_r2, r4_r0);// 3 cycles  i
+    
+    __m128 d_r  = _mm_mul_ps(d_mu_dt, r);  // 5 cycles    k
+    __m128 d_k_2= _mm_mul_ps(d_r, r4_r);  // 5 cycles    k
+    __m128 v_1  = _mm_add_ps(v, d_k_2);   // 3 cycles    k
+    _mm_store_ps(&p->velocity[0], v_1);
 }
+    /* base case, but sqrt and div do not run in parallel.
+    __m128 r    = _mm_sqrt_ps(r2_a);     // 20 cycles   k
+    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles    i
+    __m128 k_1  = _mm_div_ps(mu_dt, r4); // 14 cycles   i
+    __m128 k_2  = _mm_mul_ps(k_1, r);    // 5 cycles    k
+    */
+    /* very poor accuracy but fast:
+    __m128 r_rec= _mm_rsqrt_ps(r2_a);       // 5 cycles    k
+    __m128 k_0  = _mm_mul_ps(mu_dt, r_rec); // 5 cycles    k
+    __m128 k_1  = _mm_mul_ps(r_rec, r_rec); // 5 cycles
+    __m128 k_2  = _mm_mul_ps(k_0, k_1);     // 5 cycles    k+1
+    */
+    /* not faster but accurate
+    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles  
+    __m128 s05r2= _mm_mul_ps(r2_a, s05);
+    __m128 r_r_0= _mm_rsqrt_ps(r2_a);    // 5 cycles   k
+    __m128 r_r_2= _mm_mul_ps(r_r_0, r_r_0);// 5 cycles k
+    __m128 s15rr= _mm_mul_ps(s15, r_r_0);
+    __m128 s05r0= _mm_mul_ps(s05r2, r_r_0);
+    __m128 s05_0= _mm_mul_ps(s05r0, r_r_2);// 5 cycles k
+    __m128 r_r  = _mm_add_ps(s15rr, s05_0);// 3 cycles k
+    __m128 r    = _mm_mul_ps(r_r, r2_a); // 5 cycles   
+    __m128 k_1  = _mm_div_ps(mu_dt, r4); // 14 cycles  k
+    __m128 k_2  = _mm_mul_ps(k_1, r);    // 5 cycles   k
+    */
+    //__m128 d_k_2= _mm_mul_ps(d, k_2);    // 5 cycles    k
+    //__m128 v_1  = _mm_add_ps(v, d_k_2);  // 3 cycles    k
 
 static void gravitational_force_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += 8;
-    out->mul += 9;
-    out->div += 1;
-    out->sqrt += 1;
-    out->loads += 10;
-    out->stores += 3;
+    out->add += 18;
+    out->mul += 32;
+    out->div += 4;
+    out->sqrt += 4;
+    out->loads += 16;
+    out->stores += 4;
 }
 
-static particle_effect_c_o1 gravitational_force_effect(float x, float y, float z, float mu) {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 gravitational_force_effect(float x, float y, float z, float mu) {
+    particle_effect_c_o2 result;
     result.particles = 1;
     result.apply.one  = gravitational_force_apply;
     result.perf_c.one = gravitational_force_perf_c;
-    float *data = malloc(4*sizeof(float));
+    float *data = malloc_align(8*sizeof(float), 16, &result.p_to_free);
     data[0] = x;
     data[1] = y;
     data[2] = z;
-    data[3] = mu;
+    data[3] = 0;
+    data[4] = mu;
+    data[5] = mu;
+    data[6] = mu;
+    data[7] = 0;
     result.userdata = data;
+    result.p_to_free = data;
     return result;
 }
 
@@ -372,8 +411,8 @@ static void plane_bounce_perf_c(const particle *p, void *data0, float dt, perfor
     }
 }
 
-static particle_effect_c_o1 plane_bounce_effect(float x, float y, float z, float d, float a) {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 plane_bounce_effect(float x, float y, float z, float d, float a) {
+    particle_effect_c_o2 result;
     result.particles = 1;
     result.apply.one =  plane_bounce_apply;
     result.perf_c.one = plane_bounce_perf_c;
@@ -385,6 +424,7 @@ static particle_effect_c_o1 plane_bounce_effect(float x, float y, float z, float
     data[3] = d/r;
     data[4] = a;
     result.userdata = data;
+    result.p_to_free = data;
     return result;
 }
 
@@ -463,8 +503,8 @@ static void sphere_bounce_perf_c(const particle *p, void *data0, float dt, perfo
     }
 }
 
-static particle_effect_c_o1 sphere_bounce_effect(float x, float y, float z, float r, float a) {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 sphere_bounce_effect(float x, float y, float z, float r, float a) {
+    particle_effect_c_o2 result;
     result.particles = 1;
     result.apply.one =  sphere_bounce_apply;
     result.perf_c.one = sphere_bounce_perf_c;
@@ -476,6 +516,7 @@ static particle_effect_c_o1 sphere_bounce_effect(float x, float y, float z, floa
     //data[4] = r * r;
     data[4] = a;
     result.userdata = data;
+    result.p_to_free = data;
     return result;
 }
 
@@ -532,14 +573,15 @@ static void pairwise_gravitational_force_perf_c(const particle *p1, const partic
     out->stores += 6;
 }
 
-static particle_effect_c_o1 pairwise_gravitational_force_effect(float mu) {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 pairwise_gravitational_force_effect(float mu) {
+    particle_effect_c_o2 result;
     result.particles = 2;
     result.apply.two  = pairwise_gravitational_force_apply;
     result.perf_c.two = pairwise_gravitational_force_perf_c;
     float *data = malloc(1*sizeof(float));
     data[0] = mu;
     result.userdata = data;
+    result.p_to_free = data;
     return result;
 }
 
@@ -664,8 +706,8 @@ static void pairwise_sphere_collision_perf_c(const particle *p1, const particle 
     }
 }
 
-static particle_effect_c_o1 pairwise_sphere_collision_effect(float radius, float restitution) {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 pairwise_sphere_collision_effect(float radius, float restitution) {
+    particle_effect_c_o2 result;
     result.particles = 2;
     result.apply.two  = pairwise_sphere_collision_apply;
     result.perf_c.two = pairwise_sphere_collision_perf_c;
@@ -673,6 +715,7 @@ static particle_effect_c_o1 pairwise_sphere_collision_effect(float radius, float
     data[0] = radius;
     data[1] = restitution;
     result.userdata = data;
+    result.p_to_free = data;
     return result;
 }
 
@@ -700,12 +743,13 @@ static void newton_step_perf_c(const particle *p, void *data0, float dt, perform
     out->stores += 3;
 }
 
-static particle_effect_c_o1 newton_step_effect() {
-    particle_effect_c_o1 result;
+static particle_effect_c_o2 newton_step_effect() {
+    particle_effect_c_o2 result;
     result.particles = 1;
     result.apply.one  = newton_step_apply;
     result.perf_c.one = newton_step_perf_c;
     result.userdata = NULL;
+    result.p_to_free = NULL;
     return result;
 }
 

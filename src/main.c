@@ -93,7 +93,7 @@ void verify(const effect_program *test_program, const effect_program *ref_progra
         effect_program_execute(ref_program,  &ref_arr,  dt);
         effect_program_execute(test_program, &test_arr, dt);
         particle_vis_draw(&test_arr);
-        if (particle_array_compare(&ref_arr, &test_arr, 1e-4) != 0) {
+        if (particle_array_compare(&ref_arr, &test_arr, 1e-9, 1e-4) != 0) {
             fprintf(stderr, "iteration %d\n", (int)i);
             break;
         }
@@ -173,15 +173,17 @@ int main(int argc, char *argv[]) {
 
     perf_start_measurement(&perf_program_creation);
 
-    effect_program test_program_1;
     effect_program test_program_0;
+    effect_program test_program_1;
+    effect_program test_program_2;
 
     effect_program_create_naive(&test_program_0);
     effect_program_create_c_optimze1(&test_program_1);
+    effect_program_create_c_optimze2(&test_program_2);
     //effect_program_create_jit(&test_program);
 
+    test_effects_all(&test_program_2);
     test_effects_all(&test_program_1);
-    test_effects_all(&test_program_0);
 
     // compile
     effect_program_compile(&test_program_0, &effects);

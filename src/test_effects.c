@@ -44,6 +44,18 @@ static void add_random_particles_cond(particle_array *arr, size_t N, int (*pc)(p
 
 int particle_condition_function(particle p, int test_case, float *data) {
     switch(test_case) {
+        case 2: {
+                // avoid particles too near to the central force point:
+                float d0 = p.position[0] - data[0];
+                float d1 = p.position[1] - data[1];
+                float d2 = p.position[2] - data[2];
+                if (d0 * d0 + d1 * d1 + d2 * d2 < 0.001f * 0.001f) {
+                    return -1;
+                } else {
+                    return 0;
+                }
+            }
+            break;
         case 3:
         case 4: {
                 // plane bounce.
@@ -110,30 +122,37 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
     switch(test_case) {
         case 0:
             // linear accel:
+            particle_array_create(arr);
+            //return 1;
             *out_description = "linear acceleration";
             effect_desc_add_linear_accel(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
-            particle_array_create(arr);
             add_random_particles(arr, 1024);
-            return 1;
+            return 0;
             break;
         case 1:
             // linear force:
+            particle_array_create(arr);
+            //return 1;
             *out_description = "linear force";
             effect_desc_add_linear_force(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
-            particle_array_create(arr);
             add_random_particles(arr, 1024);
-            return 1;
+            return 0;
             break;
-        case 2:
-            // central force:
-            *out_description = "central force";
-            effect_desc_add_central_force(effects,  randf(-1,1), randf(-1,1), randf(-1,1), randf(-1,1));
-            particle_array_create(arr);
-            add_random_particles(arr, 1024);
-            return 1;
+        case 2: {
+                // central force:
+                particle_array_create(arr);
+                //return 1;
+                *out_description = "central force";
+                float cf_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1)};
+                effect_desc_add_central_force(effects,  cf_data[0], cf_data[1], cf_data[2], randf(0,1));
+                add_random_particles_cond(arr, 1024, particle_condition_function, test_case, cf_data);
+                return 0;
+            }
             break;
         case 3:
         case 4: {
+                particle_array_create(arr);
+                return 1;
                 if (test_case == 3) {
                     *out_description = "plane bounce, all particles in front";
                 } else if (test_case == 4) {
@@ -142,13 +161,14 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
                 float plane_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1), randf(-1,1)};
                 // plane bounce, all particles in front:
                 effect_desc_add_plane_bounce(effects, plane_data[0], plane_data[1], plane_data[2], plane_data[3], randf(0,1));
-                particle_array_create(arr);
                 add_random_particles_cond(arr, 1024, particle_condition_function, test_case, plane_data);
-                return 1;
+                return 0;
             }
             break;
         case 5:
         case 6: {
+                particle_array_create(arr);
+                return 1;
                 if (test_case == 5) {
                     *out_description = "sphere bounce, all particles outside";
                 } else if (test_case == 6) {
@@ -157,33 +177,35 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
                 float sphere_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1), randf(0,1)};
                 // sphere bounce, all particles in front:
                 effect_desc_add_sphere_bounce(effects, sphere_data[0], sphere_data[1], sphere_data[2], sphere_data[3], randf(0,1));
-                particle_array_create(arr);
                 add_random_particles_cond(arr, 1024, particle_condition_function, test_case, sphere_data);
-                return 1;
+                return 0;
             }
             break;
         case 7:
+            particle_array_create(arr);
+            return 1;
             // pairwise gravity:
             *out_description = "pairwise gravity";
             effect_desc_add_gravity_force(effects,  randf(0,1));
-            particle_array_create(arr);
             add_random_particles(arr, 200);
-            return 1;
+            return 0;
             break;
         case 8:
         case 9:
+            particle_array_create(arr);
+            return 1;
             // pairwise collision:
             *out_description = "pairwise collision";
             effect_desc_add_sphere_collision(effects, randf(0,0.1), randf(0,1));
-            particle_array_create(arr);
             add_random_particles(arr, 200);
-            return 1;
+            return 0;
             break;
         case 10:
+            particle_array_create(arr);
+            return 1;
             // linear force:
             *out_description = "newton step";
             effect_desc_add_newton_step(effects);
-            particle_array_create(arr);
             add_random_particles(arr, 1024);
             return 0;
             break;
@@ -222,7 +244,7 @@ void test_effects_all(effect_program *test_program) {
             
             double freq = 3.4e9;
             size_t cost = perf.add * 3 + perf.mul * 5 + perf.div * 11 + perf.cmp * 3 + perf.sqrt * 16 + perf.loads * 4 + perf.stores * 4;
-            size_t repeats = 5 * freq / cost;
+            size_t repeats = 10 * freq / cost;
             
             // verify:
             verify(test_program, &ref_program, &arr);

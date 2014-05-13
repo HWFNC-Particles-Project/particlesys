@@ -27,6 +27,7 @@ typedef union particle_t {
  */
 typedef struct particle_array_t {
     size_t size, capacity;
+    void *mem;
     particle *particles;
 } particle_array;
 
@@ -48,7 +49,7 @@ int particle_array_destroy(particle_array *array);
 /*
  * Compares two particle arrays. Returns 0 when both hold the same particles with tolerance eps.
  */
-int particle_array_compare(particle_array *arr1, particle_array *arr2, float eps);
+int particle_array_compare(particle_array *arr1, particle_array *arr2, float eps, float rel_eps);
 
 /*
  * returns the current size of the particle array.
