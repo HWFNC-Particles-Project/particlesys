@@ -6,6 +6,7 @@
 #include "effect_program_jit.h"
 #include "particle_vis.h"
 #include "performance_measurement.h"
+#include "test_effects.h"
 
 #include <time.h>
 #include <string.h>
@@ -179,6 +180,9 @@ int main(int argc, char *argv[]) {
     effect_program_create_c_optimze1(&test_program_1);
     //effect_program_create_jit(&test_program);
 
+    test_effects_all(&test_program_1);
+    test_effects_all(&test_program_0);
+
     // compile
     effect_program_compile(&test_program_0, &effects);
     effect_program_compile(&test_program_1, &effects);
@@ -188,9 +192,9 @@ int main(int argc, char *argv[]) {
     // execute
 	perf_start_measurement(&perf_program_execution);
 	
-	test_performance(&test_program_1, &initial_arr);
-	test_performance(&test_program_0, &initial_arr);
-    verify(&test_program_1, &ref_program, &initial_arr);
+	//test_performance(&test_program_1, &initial_arr);
+	//test_performance(&test_program_0, &initial_arr);
+    //verify(&test_program_1, &ref_program, &initial_arr);
     
     perf_stop_measurement(&perf_program_execution);
 
