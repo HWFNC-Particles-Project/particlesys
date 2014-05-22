@@ -165,11 +165,11 @@ void effect_program_c_o2_perf_c(const effect_program *self, const particle_array
     for(size_t i = 0; i < arr->size; ++i) {
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if(effects[j].particles == 1) {
-                if (effects[j].perf_c.one != NULL) 
+                if (effects[j].perf_c.one != NULL)
                     effects[j].perf_c.one(&arr->particles[i], effects[j].userdata, dt, out);
             } else if(effects[j].particles == 2) {
                 for(size_t k = 0; k<i; ++k) {
-                    if (effects[j].perf_c.two != NULL) 
+                    if (effects[j].perf_c.two != NULL)
                         effects[j].perf_c.two(&arr->particles[i], &arr->particles[k], effects[j].userdata, dt, out);
                 }
             }
@@ -269,7 +269,7 @@ static void gravitational_force_apply(particle *p, const void *data0, float dt) 
     __m128 r2   = _mm_add_ss(d2_2, d2_1);// 3 cycles    k       -> r2   = [r2          d2[0] d2[0] d2[0]]
     __m128 d_mu_dt= _mm_mul_ps(d, mu_dt);// 5 cycles
     __m128 r2_a = _mm_shuffle_ps(r2, r2, 0);// 1 cycle          -> r2_a = [r2 r2 r2 r2]
-    
+
     __m128 r    = _mm_sqrt_ps(r2_a);     // 20 cycles   k
     __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles    i
     // reciprocal with one newton step for accuracy:
@@ -278,7 +278,7 @@ static void gravitational_force_apply(particle *p, const void *data0, float dt) 
     __m128 r8_ra= _mm_mul_ps(r4_ra, r4_ra);// 5 cycles  i
     __m128 r4_r0= _mm_mul_ps(r8_ra, r4);   // 5 cycles  i
     __m128 r4_r = _mm_sub_ps(r4_r2, r4_r0);// 3 cycles  i
-    
+
     __m128 d_r  = _mm_mul_ps(d_mu_dt, r);  // 5 cycles    k
     __m128 d_k_2= _mm_mul_ps(d_r, r4_r);  // 5 cycles    k
     __m128 v_1  = _mm_add_ps(v, d_k_2);   // 3 cycles    k
@@ -297,7 +297,7 @@ static void gravitational_force_apply(particle *p, const void *data0, float dt) 
     __m128 k_2  = _mm_mul_ps(k_0, k_1);     // 5 cycles    k+1
     */
     /* not faster but accurate
-    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles  
+    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles
     __m128 s05r2= _mm_mul_ps(r2_a, s05);
     __m128 r_r_0= _mm_rsqrt_ps(r2_a);    // 5 cycles   k
     __m128 r_r_2= _mm_mul_ps(r_r_0, r_r_0);// 5 cycles k
@@ -305,7 +305,7 @@ static void gravitational_force_apply(particle *p, const void *data0, float dt) 
     __m128 s05r0= _mm_mul_ps(s05r2, r_r_0);
     __m128 s05_0= _mm_mul_ps(s05r0, r_r_2);// 5 cycles k
     __m128 r_r  = _mm_add_ps(s15rr, s05_0);// 3 cycles k
-    __m128 r    = _mm_mul_ps(r_r, r2_a); // 5 cycles   
+    __m128 r    = _mm_mul_ps(r_r, r2_a); // 5 cycles
     __m128 k_1  = _mm_div_ps(mu_dt, r4); // 14 cycles  k
     __m128 k_2  = _mm_mul_ps(k_1, r);    // 5 cycles   k
     */
@@ -317,6 +317,7 @@ static void gravitational_force_perf_c(const particle *p, void *data0, float dt,
     out->add += 18;
     out->mul += 32;
     out->div += 4;
+    out->rcp +=4;
     out->sqrt += 4;
     out->loads += 16;
     out->stores += 4;
@@ -361,12 +362,12 @@ static void plane_bounce_apply(particle *p, const void *data0, float dt) {
     __m128 pd_2 = _mm_shuffle_ps(pd_1, pd_1, 1);// 1 cycle      -> pd_2 = [pd[1]+pd[3] pd[0]+pd[2] pd[0]+pd[2] pd[0]+pd[2]]
     __m128 ddst = _mm_add_ps(pd_2, pd_1);// 3 cycles    k       -> vnrm = [ddst        ddst        xx          xx   ]
     __m128 vnrm = _mm_add_ss(vd_2, vd_1);// 3 cycles    k       -> vnrm = [vnrm        vd[0]       vd[0]       vd[0]]
-    
+
     /*union {
         __m128 i;
         uint32_t f[4];
     } brnch = {.i = _mm_and_ps(_mm_cmpgt_ss(z, ddst), _mm_cmpgt_ss(z, vnrm))};
-    
+
     if(brnch.f[0]) {*/
     float d_dist; float vnormal;
     _mm_store_ss(&d_dist, ddst); _mm_store_ss(&vnormal, vnrm);
@@ -433,43 +434,85 @@ static particle_effect_c_o2 plane_bounce_effect(float x, float y, float z, float
 static void sphere_bounce_apply(particle *p, const void *data0, float dt) {
     (void) dt;
     const float *f_data = (const float *)data0;
-    float fd0 = f_data[0];
-    float fd1 = f_data[1];
-    float fd2 = f_data[2];
+
+    //float fd0 = f_data[0];
+    //float fd1 = f_data[1];
+    //float fd2 = f_data[2];
+    //float pp0 = p->position[0];
+    //float pp1 = p->position[1];
+    //float pp2 = p->position[2];
+    //float pv0 = p->velocity[0];
+    //float pv1 = p->velocity[1];
+    //float pv2 = p->velocity[2];
+    __m128 z        = _mm_set_ps1(0.);
+    __m128 ppt      = _mm_load_ps(&p->position[0]);
+    __m128 pp       = _mm_blend_ps(ppt, z, 0b1000);
+    __m128 pvt      = _mm_load_ps(&p->velocity[0]);
+    __m128 pv       = _mm_blend_ps(pvt, z, 0b1000);
+    __m128 fdt      = _mm_load_ps(&f_data[0]);
+    __m128 fd       = _mm_blend_ps(fdt, z, 0b1000);
+
     float d   = f_data[3];
     float dec = f_data[4];
-    float pp0 = p->position[0];
-    float pp1 = p->position[1];
-    float pp2 = p->position[2];
-    float pv0 = p->velocity[0];
-    float pv1 = p->velocity[1];
-    float pv2 = p->velocity[2];
     float d2 = d * d;
-    float n0  = pp0-fd0;
-    float n1  = pp1-fd1;
-    float n2  = pp2-fd2;
-    float r2 = n0*n0 + n1*n1 + n2*n2;
-    float vnormal = n0*pv0 + n1*pv1 + n2*pv2;
-    float r2_reci = 1.0f / r2;
-    if(d2 > r2 && vnormal < 0.0f) {
+    //float n0  = pp0-fd0;
+    //float n1  = pp1-fd1;
+    //float n2  = pp2-fd2;
+    __m128 n        = _mm_sub_ps(pp, fd);
+
+    //float r2 = n0*n0 + n1*n1 + n2*n2;
+    __m128 r2m      = _mm_mul_ps(n,n);
+    __m128 r2t      = _mm_hadd_ps(r2m,r2m);
+    __m128 r2       = _mm_hadd_ps(r2t,r2t);
+
+    //float vnormal = n0*pv0 + n1*pv1 + n2*pv2;
+    __m128 vntt     = _mm_mul_ps(pv, n);
+    __m128 vnt      = _mm_hadd_ps(vntt,vntt);
+    __m128 vn       = _mm_hadd_ps(vnt,vnt);
+
+    //float r2_reci = 1.0f / r2;
+    __m128 r2_reci  = _mm_div_ps(_mm_set_ps1(1.0),r2);
+    float r2s, vns;
+    _mm_store_ss(&r2s,r2);
+    _mm_store_ss(&vns, vn);
+    if(d2 > r2s && vns < 0.0f) {
         // inside sphere and going further inside sphere:
-        float r_reci = sqrtf(r2_reci);
-        
-        float vnormal2_r2 = 2.0f * vnormal * r2_reci;
-        
-        float pv0_1 = pv0 - vnormal2_r2*n0;
-        float pv1_1 = pv1 - vnormal2_r2*n1;
-        float pv2_1 = pv2 - vnormal2_r2*n2;
-        
-        float d_r_r_reci = d * r_reci - 1.0f;
+        //float r_reci = sqrtf(r2_reci);
+        __m128 r_reci   = _mm_sqrt_ps(r2_reci);
 
-        p->velocity[0] = pv0_1 * dec;
-        p->velocity[1] = pv1_1 * dec;
-        p->velocity[2] = pv2_1 * dec;
+        //float vnormal2_r2 = 2.0f * vnormal * r2_reci;
+        __m128 vn2_r2t  = _mm_mul_ps(_mm_set_ps1(2.0), vn);
+        __m128 vn2_r2   = _mm_mul_ps(vn2_r2t, r2_reci);
 
-        p->position[0] = pp0 + d_r_r_reci*n0;
-        p->position[1] = pp1 + d_r_r_reci*n1;
-        p->position[2] = pp2 + d_r_r_reci*n2;
+        //float pv0_1 = pv0 - vnormal2_r2*n0;
+        //float pv1_1 = pv1 - vnormal2_r2*n1;
+        //float pv2_1 = pv2 - vnormal2_r2*n2;
+
+        __m128 vn_n     = _mm_mul_ps(vn2_r2, n);
+        __m128 pvut     = _mm_sub_ps(pv, vn_n);
+
+        //float d_r_r_reci = d * r_reci - 1.0f;
+        __m128 dt           = _mm_load_ps1(&d);
+        __m128 d_reci_1t    = _mm_mul_ps(dt,r_reci);
+        __m128 d_reci_1     = _mm_sub_ps(d_reci_1t,_mm_set_ps1(1.0));
+
+        //p->velocity[0] = pv0_1 * dec;
+        //p->velocity[1] = pv1_1 * dec;
+        //p->velocity[2] = pv2_1 * dec;
+        __m128 vdec     = _mm_load_ps1(&dec);
+        __m128 pvu      = _mm_mul_ps(vdec, pvut);
+        __m128 pv4      = _mm_load_ps1(&p->velocity[3]);
+        __m128 pvus     = _mm_blend_ps(pvu, pv4, 0b1000);
+        _mm_store_ps(&p->velocity[0], pvus);
+
+        //p->position[0] = pp0 + d_r_r_reci*n0;
+        //p->position[1] = pp1 + d_r_r_reci*n1;
+        //p->position[2] = pp2 + d_r_r_reci*n2;
+        __m128 d_nt     = _mm_mul_ps(n, d_reci_1);
+        __m128 d_n      = _mm_add_ps(pp, d_nt);
+        __m128 pp4      = _mm_load_ps1(&p->position[3]);
+        __m128 ppu      = _mm_blend_ps(d_n, pp4, 0b1000);
+        _mm_store_ps(&p->position[0], ppu);
     }
 }
 
@@ -525,44 +568,70 @@ static particle_effect_c_o2 sphere_bounce_effect(float x, float y, float z, floa
 static void pairwise_gravitational_force_apply(particle *p1, particle *p2, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
     float mu = f_data[0];
-    float pp10 = p1->position[0];
-    float pp11 = p1->position[1];
-    float pp12 = p1->position[2];
-    float pp20 = p2->position[0];
-    float pp21 = p2->position[1];
-    float pp22 = p2->position[2];
-    float pv10 = p1->velocity[0];
-    float pv11 = p1->velocity[1];
-    float pv12 = p1->velocity[2];
-    float pv20 = p2->velocity[0];
-    float pv21 = p2->velocity[1];
-    float pv22 = p2->velocity[2];
-    float m1 = p1->mass;
-    float m2 = p2->mass;
-    float dt_mu = dt * mu;
-    float d0 = pp20-pp10;
-    float d1 = pp21-pp11;
-    float d2 = pp22-pp12;
-    float r2 = d0*d0 + d1*d1 + d2*d2;
-    float r4 = r2 * r2;
-    float r = sqrtf(r2);
+
+    __m128 z        = _mm_set_ps1(0.);
+    __m128 pp1      = _mm_load_ps(&p1->position[0]);
+    __m128 pp2      = _mm_load_ps(&p2->position[0]);
+    __m128 pv1      = _mm_load_ps(&p1->velocity[0]);
+    __m128 pv2      = _mm_load_ps(&p2->velocity[0]);
+
+    float dtmu = dt * mu;
+    __m128 m1       = _mm_load_ps1(&p1->mass);
+    __m128 m2       = _mm_load_ps1(&p2->mass);
+    __m128 dt_mu    = _mm_load_ps1(&dtmu);
+
+    //float d0 = pp20-pp10;
+    //float d1 = pp21-pp11;
+    //float d2 = pp22-pp12;
+    //float r2 = d0*d0 + d1*d1 + d2*d2;
+    //float r4 = r2 * r2;
+    //float r = sqrtf(r2);
+    __m128 dift     = _mm_sub_ps(pp2,pp1);
+    __m128 dif      = _mm_blend_ps(dift, z, 0b1000);
+    __m128 dif2     = _mm_mul_ps(dif,dif);
+    __m128 r2t      = _mm_hadd_ps(dif2,dif2);
+    __m128 r2       = _mm_hadd_ps(r2t,r2t);
+    __m128 r4       = _mm_mul_ps(r2,r2);
+    __m128 r        = _mm_sqrt_ps(r2);
     // is r^3 because we need to normalize diff.
-    float mu_0 = dt_mu / r4;
-    float mu_1 = mu_0 * r;
-    float mu_m2 = mu_1 * m2;
-    float mu_m1 = mu_1 * m1;
-    float d0_1 = d0 * mu_m2;
-    float d1_1 = d1 * mu_m2;
-    float d2_1 = d2 * mu_m2;
-    float d0_2 = d0 * mu_m1;
-    float d1_2 = d1 * mu_m1;
-    float d2_2 = d2 * mu_m1;
-    p1->velocity[0] = pv10 - d0_1;
-    p1->velocity[1] = pv11 - d1_1;
-    p1->velocity[2] = pv12 - d2_1;
-    p2->velocity[0] = pv20 + d0_2;
-    p2->velocity[1] = pv21 + d1_2;
-    p2->velocity[2] = pv22 + d2_2;
+    //float mu_0 = dt_mu / r4;
+    //float mu_1 = mu_0 * r;
+    //float mu_m2 = mu_1 * m2;
+    //float mu_m1 = mu_1 * m1;
+
+    __m128 mu_0     = _mm_div_ps(dt_mu, r4);
+    __m128 mu_1     = _mm_mul_ps(mu_0, r);
+    __m128 mu_m1    = _mm_mul_ps(mu_1,m1);
+    __m128 mu_m2    = _mm_mul_ps(mu_1,m2);
+
+    //float d0_1 = d0 * mu_m2;
+    //float d1_1 = d1 * mu_m2;
+    //float d2_1 = d2 * mu_m2;
+    //float d0_2 = d0 * mu_m1;
+    //float d1_2 = d1 * mu_m1;
+    //float d2_2 = d2 * mu_m1;
+
+    __m128 dv1t     = _mm_mul_ps(dif, mu_m2);
+    __m128 dv2t     = _mm_mul_ps(dif, mu_m1);
+
+    //p1->velocity[0] = pv10 - d0_1;
+    //p1->velocity[1] = pv11 - d1_1;
+    //p1->velocity[2] = pv12 - d2_1;
+    //p2->velocity[0] = pv20 + d0_2;
+    //p2->velocity[1] = pv21 + d1_2;
+    //p2->velocity[2] = pv22 + d2_2;
+    __m128 dv1u     = _mm_sub_ps(pv1,dv1t);
+    __m128 dv2u     = _mm_add_ps(pv2,dv2t);
+
+    __m128 c1       = _mm_load_ps1(&p1->charge);
+    __m128 c2       = _mm_load_ps1(&p2->charge);
+    __m128 dv1      = _mm_blend_ps(dv1u, c1, 0b1000);
+    __m128 dv2      = _mm_blend_ps(dv2u, c2, 0b1000);
+
+    _mm_store_ps(&p1->velocity[0], dv1);
+    _mm_store_ps(&p2->velocity[0], dv2);
+
+
 }
 
 static void pairwise_gravitational_force_perf_c(const particle *p1, const particle *p2, void *data0, float dt, performance_count *out) {
@@ -591,50 +660,79 @@ static void pairwise_sphere_collision_apply(particle *p1, particle *p2, const vo
     (void) dt;
     const float *f_data = (const float *)data0;
     float radius = f_data[0];
-    float pp10 = p1->position[0];
-    float pp11 = p1->position[1];
-    float pp12 = p1->position[2];
-    float pp20 = p2->position[0];
-    float pp21 = p2->position[1];
-    float pp22 = p2->position[2];
-    float pv10 = p1->velocity[0];
-    float pv11 = p1->velocity[1];
-    float pv12 = p1->velocity[2];
-    float pv20 = p2->velocity[0];
-    float pv21 = p2->velocity[1];
-    float pv22 = p2->velocity[2];
-    float d0 = pp20 - pp10;
-    float d1 = pp21 - pp11;
-    float d2 = pp22 - pp12;
-    float radius2 = radius * radius;
-    float r2 = d0 * d0 + d1 * d1 + d2 * d2;
+    __m128 z        = _mm_set_ps1(0.);
+    __m128 pp1      = _mm_load_ps(&p1->position[0]);
+    __m128 pp2      = _mm_load_ps(&p2->position[0]);
+    __m128 pv1      = _mm_load_ps(&p1->velocity[0]);
+    __m128 pv2      = _mm_load_ps(&p2->velocity[0]);
+    //float pp10 = p1->position[0];
+    //float pp11 = p1->position[1];
+    //float pp12 = p1->position[2];
+    //float pp20 = p2->position[0];
+    //float pp21 = p2->position[1];
+    //float pp22 = p2->position[2];
+    //float pv10 = p1->velocity[0];
+    //float pv11 = p1->velocity[1];
+    //float pv12 = p1->velocity[2];
+    //float pv20 = p2->velocity[0];
+    //float pv21 = p2->velocity[1];
+    //float pv22 = p2->velocity[2];
+    //float d0 = pp20 - pp10;
+    //float d1 = pp21 - pp11;
+    //float d2 = pp22 - pp12;
+    //float s_radius2 = radius * radius;
+    //float s_r2 = d0 * d0 + d1 * d1 + d2 * d2;
+
+    __m128 dift     = _mm_sub_ps(pp2, pp1);
+    __m128 difp     = _mm_blend_ps(dift, z, 0b1000); //[d0 d1 d2 0]
+    __m128 difp2    = _mm_mul_ps(difp,difp);
+    __m128 difp2ss  = _mm_hadd_ps(difp2,difp2);
+    __m128 sump2s   = _mm_hadd_ps(difp2ss, difp2ss); // sum^2
+
     // project velocities onto diff vector:
-    float pv10d0 = pv10*d0;
-    float pv11d1 = pv11*d1;
-    float pv12d2 = pv12*d2;
-    float pv20d0 = pv20*d0;
-    float pv21d1 = pv21*d1;
-    float pv22d2 = pv22*d2;
-    float u1_0 = pv10d0 + pv11d1 + pv12d2;
-    float u2_0 = pv20d0 + pv21d1 + pv22d2;
-    float u1_u2_0 = (pv10d0-pv20d0) + (pv11d1-pv21d1) + (pv12d2-pv22d2);
+    //float pv10d0 = pv10*d0;
+    //float pv11d1 = pv11*d1;
+    //float pv12d2 = pv12*d2;
+    //float pv20d0 = pv20*d0;
+    //float pv21d1 = pv21*d1;
+    //float pv22d2 = pv22*d2;
+    __m128 propv1   = _mm_mul_ps(pv1, difp);
+    __m128 propv2   = _mm_mul_ps(pv2, difp);
+
+    //float u1_0 = pv10d0 + pv11d1 + pv12d2;
+    //float u2_0 = pv20d0 + pv21d1 + pv22d2;
+    __m128 u_0t     = _mm_hadd_ps(propv1,propv2);
+    __m128 u_0      = _mm_hadd_ps(u_0t, u_0t); // u0 = [u1_0, u2_0, u1_0, u2_0]
+
+    float u0[4];
+    _mm_store_ps(&u0[0], u_0);
+
+    float radius2 = radius * radius;
+    float r2;
+    _mm_store_ss(&r2, sump2s);
     //float u1_u2_0 = u1_0 - u2_0;
+    float u1_u2_0 = u0[0] - u0[1];
+
     if(r2 < radius2) {
         // within collision range:
         float r = sqrtf(r2);
         float r_reci = 1.0f / r;
         float radius_r = radius - r;
         float radius_r05 = 0.5f * radius_r;
-        float d0_1 = d0 * r_reci;
-        float d1_1 = d1 * r_reci;
-        float d2_1 = d2 * r_reci;
+
+        //float d0_1 = d0 * r_reci;
+        //float d1_1 = d1 * r_reci;
+        //float d2_1 = d2 * r_reci;
+        __m128 r_rec    = _mm_load_ps1(&r_reci);
+        __m128 dif1     = _mm_mul_ps(difp, r_rec);
+
         if(u1_u2_0 > 0.0f) {
             float m1 = p1->mass;
             float m2 = p2->mass;
             float restitution = f_data[1];
             float m12_reci = 1.0f/(m1+m2);
-            float u1 = u1_0 * r_reci;
-            float u2 = u2_0 * r_reci;
+            float u1 = u0[0] * r_reci;
+            float u2 = u0[1] * r_reci;
             float um1pum2 = u1*m1+u2*m2;
             float u1_u2 = u1_u2_0 * r_reci;
             // particles are approaching:
@@ -644,29 +742,61 @@ static void pairwise_sphere_collision_apply(particle *p1, particle *p2, const vo
             // update velocities:
             float v1_u1 = v1 - u1;
             float v2_u2 = v2 - u2;
-            float d0_1_v1_u1 = d0_1 * v1_u1;
-            float d1_1_v1_u1 = d1_1 * v1_u1;
-            float d2_1_v1_u1 = d2_1 * v1_u1;
-            float d0_1_v2_u2 = d0_1 * v2_u2;
-            float d1_1_v2_u2 = d1_1 * v2_u2;
-            float d2_1_v2_u2 = d2_1 * v2_u2;
-            p1->velocity[0] = pv10 + d0_1_v1_u1;
-            p1->velocity[1] = pv11 + d1_1_v1_u1;
-            p1->velocity[2] = pv12 + d2_1_v1_u1;
-            p2->velocity[0] = pv20 + d0_1_v2_u2;
-            p2->velocity[1] = pv21 + d1_1_v2_u2;
-            p2->velocity[2] = pv22 + d2_1_v2_u2;
+
+            __m128 v1u1     = _mm_load_ps1(&v1_u1);
+            __m128 v2u2     = _mm_load_ps1(&v2_u2);
+
+            //float d0_1_v1_u1 = d0_1 * v1_u1;
+            //float d1_1_v1_u1 = d1_1 * v1_u1;
+            //float d2_1_v1_u1 = d2_1 * v1_u1;
+            //float d0_1_v2_u2 = d0_1 * v2_u2;
+            //float d1_1_v2_u2 = d1_1 * v2_u2;
+            //float d2_1_v2_u2 = d2_1 * v2_u2;
+
+            __m128 d1v1u1   = _mm_mul_ps(dif1, v1u1);
+            __m128 d1v2u2   = _mm_mul_ps(dif1, v2u2);
+
+            //p1->velocity[0] = pv10 + d0_1_v1_u1;
+            //p1->velocity[1] = pv11 + d1_1_v1_u1;
+            //p1->velocity[2] = pv12 + d2_1_v1_u1;
+            //p2->velocity[0] = pv20 + d0_1_v2_u2;
+            //p2->velocity[1] = pv21 + d1_1_v2_u2;
+            //p2->velocity[2] = pv22 + d2_1_v2_u2;
+            __m128 v1uv     = _mm_add_ps(pv1, d1v1u1);
+            __m128 v2uv     = _mm_add_ps(pv2, d1v2u2);
+            __m128 v1_rec   = _mm_load_ps1(&p1->velocity[3]);
+            __m128 v2_rec   = _mm_load_ps1(&p2->velocity[3]);
+            __m128 v1_rec1  = _mm_blend_ps(v1uv, v1_rec, 0b1000);
+            __m128 v2_rec1  = _mm_blend_ps(v2uv, v2_rec, 0b1000);
+
+            _mm_store_ps(&p1->velocity[0], v1_rec1);
+            _mm_store_ps(&p2->velocity[0], v2_rec1);
         }
         // move particles apart, such that they don't intersect (in the direction of diff)
-        float d0_1_rr05 = d0_1*radius_r05;
-        float d1_1_rr05 = d1_1*radius_r05;
-        float d2_1_rr05 = d2_1*radius_r05;
-        p1->position[0] = pp10 - d0_1_rr05;
-        p1->position[1] = pp11 - d1_1_rr05;
-        p1->position[2] = pp12 - d2_1_rr05;
-        p2->position[0] = pp20 + d0_1_rr05;
-        p2->position[1] = pp21 + d1_1_rr05;
-        p2->position[2] = pp22 + d2_1_rr05;
+        //float d0_1_rr05 = d0_1*radius_r05;
+        //float d1_1_rr05 = d1_1*radius_r05;
+        //float d2_1_rr05 = d2_1*radius_r05;
+
+        //p1->position[0] = pp10 - d0_1_rr05;
+        //p1->position[1] = pp11 - d1_1_rr05;
+        //p1->position[2] = pp12 - d2_1_rr05;
+        //p2->position[0] = pp20 + d0_1_rr05;
+        //p2->position[1] = pp21 + d1_1_rr05;
+        //p2->position[2] = pp22 + d2_1_rr05;
+
+        __m128 r05      = _mm_load_ps1(&radius_r05);
+        __m128 dr05     = _mm_mul_ps(dif1, r05);
+
+        __m128 pp1_u    = _mm_sub_ps(pp1, dr05);
+        __m128 pp2_u    = _mm_add_ps(pp2, dr05);
+
+
+        __m128 p1_rec   = _mm_load_ps1(&p1->position[3]);
+        __m128 p2_rec   = _mm_load_ps1(&p2->position[3]);
+        __m128 p1_rec1  = _mm_blend_ps(pp1_u, p1_rec, 0b1000);
+        __m128 p2_rec1  = _mm_blend_ps(pp2_u, p2_rec, 0b1000);
+        _mm_store_ps(&p1->position[0], p1_rec1);
+        _mm_store_ps(&p2->position[0], p2_rec1);
     }
 }
 
@@ -723,18 +853,14 @@ static particle_effect_c_o2 pairwise_sphere_collision_effect(float radius, float
 
 static void newton_step_apply(particle *p, const void *data0, float dt) {
     (void) data0;
-    float pp0 = p->position[0];
-    float pp1 = p->position[1];
-    float pp2 = p->position[2];
-    float pv0 = p->velocity[0];
-    float pv1 = p->velocity[1];
-    float pv2 = p->velocity[2];
-    float pv0_1 = pv0 * dt;
-    float pv1_1 = pv1 * dt;
-    float pv2_1 = pv2 * dt;
-    p->position[0] = pp0 + pv0_1;
-    p->position[1] = pp1 + pv1_1;
-    p->position[2] = pp2 + pv2_1;
+    __m128 z    = _mm_set_ps1(0.);
+    __m128 pp   = _mm_load_ps(&p->position[0]);
+    __m128 pv   = _mm_load_ps(&p->velocity[0]);
+    __m128 vdt   = _mm_load_ps1(&dt);
+    __m128 ps   = _mm_mul_ps(pv, vdt);
+    __m128 ps_c = _mm_blend_ps(ps, z, 0b1000);
+    __m128 n_pp = _mm_add_ps(pp, ps_c);
+    _mm_store_ps(&p->position[0], n_pp);
 }
 
 static void newton_step_perf_c(const particle *p, void *data0, float dt, performance_count *out) {

@@ -14,7 +14,9 @@ typedef struct performance_count_t {
     size_t cmp;
     size_t mul;
     size_t div;
+    size_t rcp;
     size_t sqrt;
+    size_t rsqrt;
     size_t loads;
     size_t stores;
 } performance_count;

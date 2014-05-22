@@ -17,6 +17,7 @@
 #define DT 0.01f
 
 void test_performance(const effect_program *test_program, const particle_array *initial_arr) {
+return;
     // first, determine approximate number of iterations to perform
     size_t iterations = 100;
     size_t repeats = 1;
@@ -46,7 +47,7 @@ void test_performance(const effect_program *test_program, const particle_array *
     clock_t end = clock();
     printf("time: %d\n", (int)(end-start));
     double cycles = (end-start) * 0.001 * 3.4e9;
-    
+
     performance_count total;
     memset(&total, 0, sizeof(total));
     for (size_t i = 0; i < iterations; ++i) {
@@ -54,7 +55,9 @@ void test_performance(const effect_program *test_program, const particle_array *
         total.cmp += perf_array[i].cmp * repeats;
         total.mul += perf_array[i].mul * repeats;
         total.div += perf_array[i].div * repeats;
+        total.rcp += perf_array[i].rcp * repeats;
         total.sqrt += perf_array[i].sqrt * repeats;
+        total.rsqrt += perf_array[i].sqrt * repeats;
         total.loads += perf_array[i].loads * repeats;
         total.stores += perf_array[i].stores * repeats;
     }
@@ -71,10 +74,12 @@ void test_performance(const effect_program *test_program, const particle_array *
     printf("cmp:         %8.2f\n", (double)total.cmp / part_iteration);
     printf("mul:         %8.2f\n", (double)total.mul / part_iteration);
     printf("div:         %8.2f\n", (double)total.div / part_iteration);
+    printf("rcp:         %8.2f\n", (double)total.rcp / part_iteration);
     printf("sqrt:        %8.2f\n", (double)total.sqrt / part_iteration);
+    printf("rsqrt:       %8.2f\n", (double)total.rsqrt / part_iteration);
     printf("lds:         %8.2f\n", (double)total.loads / part_iteration);
     printf("sts:         %8.2f\n", (double)total.stores / part_iteration);
-    
+
     particle_array_destroy(&arr);
     free(perf_array);
 }
@@ -193,11 +198,11 @@ int main(int argc, char *argv[]) {
 
     // execute
 	perf_start_measurement(&perf_program_execution);
-	
+
 	//test_performance(&test_program_1, &initial_arr);
 	//test_performance(&test_program_0, &initial_arr);
     //verify(&test_program_1, &ref_program, &initial_arr);
-    
+
     perf_stop_measurement(&perf_program_execution);
 
     // print mesurements
