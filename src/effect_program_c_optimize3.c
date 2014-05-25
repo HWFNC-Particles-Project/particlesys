@@ -255,7 +255,7 @@ void effect_program_c_o3_perf_c(const effect_program *self, const particle_array
     void *warray2_mem = NULL;
     reordered_particles *warray1 = malloc_align(M * sizeof(reordered_particles), 16, &warray1_mem);
     reordered_particles *warray2 = malloc_align(M * sizeof(reordered_particles), 16, &warray2_mem);
-    for(size_t i = 0; i < arr->size; ++i) {
+    for(size_t i = 0; i < arr->size; i += M * 4) {
         // load particles into working array:
         for(size_t k = 0; k < M; ++k) {
             size_t base = i + k * 4;
@@ -385,77 +385,67 @@ static void print__m128(__m128 d) {
     printf("%12.4e, %12.4e, %12.4e, %12.4e\n", data[0], data[1], data[2], data[3]);
 }
 
-static void gravitational_force_apply(particle *p, const void *data0, float dt) {
+static void gravitational_force_apply(reordered_particles *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
-    __m128 dtv  = _mm_set_ps1(dt);
-    __m128 cntr = _mm_load_ps(&f_data[0]);
-    __m128 mu   = _mm_load_ps(&f_data[4]);
-    __m128 pp   = _mm_load_ps(&p->position[0]);
-    __m128 v    = _mm_load_ps(&p->velocity[0]);
-    //__m128 s15  = _mm_set1_ps(1.5f);
-    //__m128 s05  = _mm_set1_ps(-0.5f);
-    //__m128 z    = _mm_setzero_ps();      // 1 cycle
-    __m128 d    = _mm_sub_ps(pp, cntr);  // 3 cycles    k       -> d = pp - cntr
-    __m128 d2   = _mm_mul_ps(d, d);      // 5 cycles    k       -> d2 = d * d
-    __m128 mu_dt= _mm_mul_ps(mu, dtv);   // 5 cycles
-    __m128 d2_3 = _mm_movehl_ps(d2, d2); // 1 cycle     k       -> d2_3 = [d2[2]       xx    d2[2] xx   ]
-    __m128 d2_2 = _mm_shuffle_ps(d2, d2, 1);// 1 cycle          -> d2_2 = [d2[1]       d2[0] d2[0] d2[0]]
-    __m128 d2_1 = _mm_add_ss(d2,   d2_3);// 3 cycles    k       -> d2_1 = [d2[0]+d2[2] d2[1] d2[2] xx   ]
-    __m128 r2   = _mm_add_ss(d2_2, d2_1);// 3 cycles    k       -> r2   = [r2          d2[0] d2[0] d2[0]]
-    __m128 d_mu_dt= _mm_mul_ps(d, mu_dt);// 5 cycles
-    __m128 r2_a = _mm_shuffle_ps(r2, r2, 0);// 1 cycle          -> r2_a = [r2 r2 r2 r2]
-
-    __m128 r    = _mm_sqrt_ps(r2_a);     // 20 cycles   k
-    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles    i
-    // reciprocal with one newton step for accuracy:
-    __m128 r4_ra= _mm_rcp_ps(r4);        // 3 cycles    i
-    __m128 r4_r2= _mm_add_ps(r4_ra, r4_ra);// 3 cycles
-    __m128 r8_ra= _mm_mul_ps(r4_ra, r4_ra);// 5 cycles  i
-    __m128 r4_r0= _mm_mul_ps(r8_ra, r4);   // 5 cycles  i
-    __m128 r4_r = _mm_sub_ps(r4_r2, r4_r0);// 3 cycles  i
-
-    __m128 d_r  = _mm_mul_ps(d_mu_dt, r);  // 5 cycles    k
-    __m128 d_k_2= _mm_mul_ps(d_r, r4_r);  // 5 cycles    k
-    __m128 v_1  = _mm_add_ps(v, d_k_2);   // 3 cycles    k
-    _mm_store_ps(&p->velocity[0], v_1);
+    __m128 dtv    = _mm_set_ps1(dt);
+    __m128 cnt0   = _mm_load_ps1(&f_data[0]);
+    __m128 cnt1   = _mm_load_ps1(&f_data[1]);
+    __m128 cnt2   = _mm_load_ps1(&f_data[2]);
+    __m128 mu     = _mm_load_ps1(&f_data[3]);
+    __m128 mu_dt  = _mm_mul_ps(mu, dtv);
+    for (size_t k = 0; k < M; ++k) {
+        __m128 p0     = _mm_load_ps(&p[k].position[0][0]);
+        __m128 p1     = _mm_load_ps(&p[k].position[1][0]);
+        __m128 p2     = _mm_load_ps(&p[k].position[2][0]);
+        __m128 v0     = _mm_load_ps(&p[k].velocity[0][0]);
+        __m128 v1     = _mm_load_ps(&p[k].velocity[1][0]);
+        __m128 v2     = _mm_load_ps(&p[k].velocity[2][0]);
+        __m128 d0     = _mm_sub_ps(p0, cnt0);
+        __m128 d1     = _mm_sub_ps(p1, cnt1);
+        __m128 d2     = _mm_sub_ps(p2, cnt2);
+        __m128 d2_0   = _mm_mul_ps(d0, d0);
+        __m128 d2_1   = _mm_mul_ps(d1, d1);
+        __m128 d2_2   = _mm_mul_ps(d2, d2);
+        __m128 r2_1   = _mm_add_ps(d2_0, d2_1);
+        __m128 r2     = _mm_add_ps(r2_1, d2_2);
+        __m128 d0_mu_dt=_mm_mul_ps(d0, mu_dt);
+        __m128 d1_mu_dt=_mm_mul_ps(d1, mu_dt);
+        __m128 d2_mu_dt=_mm_mul_ps(d2, mu_dt);
+        __m128 r      = _mm_sqrt_ps(r2);
+        __m128 r4     = _mm_mul_ps(r2, r2);
+        // reciprocal with one newton step for accuracy:
+        __m128 r4_ra  = _mm_rcp_ps(r4);
+        __m128 r4_r2  = _mm_add_ps(r4_ra, r4_ra);
+        __m128 r8_ra  = _mm_mul_ps(r4_ra, r4_ra);
+        __m128 r4_r0  = _mm_mul_ps(r8_ra, r4);
+        __m128 r4_r   = _mm_sub_ps(r4_r2, r4_r0);
+        
+        __m128 d0_r   = _mm_mul_ps(d0_mu_dt, r);
+        __m128 d1_r   = _mm_mul_ps(d1_mu_dt, r);
+        __m128 d2_r   = _mm_mul_ps(d2_mu_dt, r);
+        
+        __m128 d0_k_2 = _mm_mul_ps(d0_r, r4_r);
+        __m128 d1_k_2 = _mm_mul_ps(d1_r, r4_r);
+        __m128 d2_k_2 = _mm_mul_ps(d2_r, r4_r);
+        
+        __m128 v1_0   = _mm_add_ps(v0, d0_k_2);
+        __m128 v1_1   = _mm_add_ps(v1, d1_k_2);
+        __m128 v1_2   = _mm_add_ps(v2, d2_k_2);
+        
+        _mm_store_ps(&p[k].velocity[0][0], v1_0);
+        _mm_store_ps(&p[k].velocity[1][0], v1_1);
+        _mm_store_ps(&p[k].velocity[2][0], v1_2);
+    }
 }
-    /* base case, but sqrt and div do not run in parallel.
-    __m128 r    = _mm_sqrt_ps(r2_a);     // 20 cycles   k
-    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles    i
-    __m128 k_1  = _mm_div_ps(mu_dt, r4); // 14 cycles   i
-    __m128 k_2  = _mm_mul_ps(k_1, r);    // 5 cycles    k
-    */
-    /* very poor accuracy but fast:
-    __m128 r_rec= _mm_rsqrt_ps(r2_a);       // 5 cycles    k
-    __m128 k_0  = _mm_mul_ps(mu_dt, r_rec); // 5 cycles    k
-    __m128 k_1  = _mm_mul_ps(r_rec, r_rec); // 5 cycles
-    __m128 k_2  = _mm_mul_ps(k_0, k_1);     // 5 cycles    k+1
-    */
-    /* not faster but accurate
-    __m128 r4   = _mm_mul_ps(r2_a, r2_a);// 5 cycles
-    __m128 s05r2= _mm_mul_ps(r2_a, s05);
-    __m128 r_r_0= _mm_rsqrt_ps(r2_a);    // 5 cycles   k
-    __m128 r_r_2= _mm_mul_ps(r_r_0, r_r_0);// 5 cycles k
-    __m128 s15rr= _mm_mul_ps(s15, r_r_0);
-    __m128 s05r0= _mm_mul_ps(s05r2, r_r_0);
-    __m128 s05_0= _mm_mul_ps(s05r0, r_r_2);// 5 cycles k
-    __m128 r_r  = _mm_add_ps(s15rr, s05_0);// 3 cycles k
-    __m128 r    = _mm_mul_ps(r_r, r2_a); // 5 cycles
-    __m128 k_1  = _mm_div_ps(mu_dt, r4); // 14 cycles  k
-    __m128 k_2  = _mm_mul_ps(k_1, r);    // 5 cycles   k
-    */
-    //__m128 d_k_2= _mm_mul_ps(d, k_2);    // 5 cycles    k
-    //__m128 v_1  = _mm_add_ps(v, d_k_2);  // 3 cycles    k
 
-static void gravitational_force_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
+static void gravitational_force_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += 18;
-    out->mul += 32;
-    out->div += 4;
-    out->rcp +=4;
-    out->sqrt += 4;
-    out->loads += 16;
-    out->stores += 4;
+    out->add += M * 4 * 10;
+    out->mul += M * 4 * 15 + 1;
+    out->rcp += M * 4 * 1;
+    out->sqrt += M * 4 * 1;
+    out->loads += M * 4 * 6 + 4;
+    out->stores += M * 4 * 3;
 }
 
 static particle_effect_c_o3 gravitational_force_effect(float x, float y, float z, float mu) {
@@ -463,15 +453,11 @@ static particle_effect_c_o3 gravitational_force_effect(float x, float y, float z
     result.particles = 1;
     result.apply.one  = gravitational_force_apply;
     result.perf_c.one = gravitational_force_perf_c;
-    float *data = malloc_align(8*sizeof(float), 16, &result.p_to_free);
+    float *data = malloc_align(4*sizeof(float), 16, &result.p_to_free);
     data[0] = x;
     data[1] = y;
     data[2] = z;
-    data[3] = 0;
-    data[4] = mu;
-    data[5] = mu;
-    data[6] = mu;
-    data[7] = 0;
+    data[3] = mu;
     result.userdata = data;
     result.p_to_free = data;
     return result;
