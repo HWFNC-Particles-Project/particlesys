@@ -110,13 +110,11 @@ void effect_program_c_o3_compile(effect_program *self, const effect_desc *desc) 
                                                         el->float_usr[4]);
                 break;
             case EFFECT_TYPE_SPHERE_BOUNCE:
-                printf("error: sphere bounce not implemented!\n");
-                /*effects[i] = sphere_bounce_effect(      el->float_usr[0],
+                effects[i] = sphere_bounce_effect(      el->float_usr[0],
                                                         el->float_usr[1],
                                                         el->float_usr[2],
                                                         el->float_usr[3],
-                                                        el->float_usr[4]);*/
-                effects[i] = linear_accel_effect(0,0,0);
+                                                        el->float_usr[4]);
                 break;
             case EFFECT_TYPE_NEWTON_STEP:
                 effects[i] = newton_step_effect();
@@ -505,21 +503,18 @@ static void plane_bounce_apply(reordered_particles *p, const void *data0, float 
         __m128 ddst   = _mm_add_ps(ddst_0, ddst_1);
         __m128 vnrm   = _mm_add_ps(vnrm_0, vd2);
         
-        __m128 ddst_z = _mm_min_ps(z, ddst);
-        __m128 vnrm_z = _mm_min_ps(z, vnrm);
+        __m128 dmask  = _mm_cmplt_ps(ddst, z);
+        __m128 vmask  = _mm_cmplt_ps(vnrm, z);
+        __m128 mask   = _mm_and_ps(dmask, vmask);// mask is true when particle should be modified
         
-        __m128 vmask  = _mm_cmplt_ps(ddst, z);  // mask is true when particle should be modified
-        __m128 dmask  = _mm_cmplt_ps(vnrm, z);  // mask is true when particle should be modified
-        
-        __m128 ddst_zm= _mm_and_ps(ddst_z, dmask);
-        __m128 vnrm_zm= _mm_and_ps(vnrm_z, vmask);
+        __m128 ddst_zm= _mm_and_ps(ddst, mask);
+        __m128 vnrm_zm= _mm_and_ps(vnrm, mask);
         
         __m128 ddst_n0= _mm_mul_ps(ddst_zm, nv0);
         __m128 ddst_n1= _mm_mul_ps(ddst_zm, nv1);
         __m128 ddst_n2= _mm_mul_ps(ddst_zm, nv2);
         
-        __m128 dec_m1 = _mm_blendv_ps(one, dec,    vmask);
-        __m128 dec_m  = _mm_blendv_ps(one, dec_m1, dmask);
+        __m128 dec_m  = _mm_blendv_ps(one, dec, mask);
         
         __m128 vnrm_2n0= _mm_mul_ps(vnrm_zm, nv0_2);
         __m128 vnrm_2n1= _mm_mul_ps(vnrm_zm, nv1_2);
@@ -546,13 +541,8 @@ static void plane_bounce_apply(reordered_particles *p, const void *data0, float 
     }
 }
 
-static void plane_bounce_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
+static void plane_bounce_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) dt;
-    float *data = data0;
-    float dist =    data[0]*p->position[0] + data[1]*p->position[1] + data[2]*p->position[2];
-    float vnormal = data[0]*p->velocity[0] + data[1]*p->velocity[1] + data[2]*p->velocity[2];
-    float d = data[3];
-    
     out->add +=    M * 4 * 11;
     out->mul +=    M * 4 * 15 + 3 * 4;
     out->cmp +=    M * 4 * 4;
@@ -576,121 +566,111 @@ static particle_effect_c_o3 plane_bounce_effect(float x, float y, float z, float
     return result;
 }
 
-static void sphere_bounce_apply(particle *p, const void *data0, float dt) {
+static void sphere_bounce_apply(reordered_particles *p, const void *data0, float dt) {
     (void) dt;
     const float *f_data = (const float *)data0;
-
-    //float fd0 = f_data[0];
-    //float fd1 = f_data[1];
-    //float fd2 = f_data[2];
-    //float pp0 = p->position[0];
-    //float pp1 = p->position[1];
-    //float pp2 = p->position[2];
-    //float pv0 = p->velocity[0];
-    //float pv1 = p->velocity[1];
-    //float pv2 = p->velocity[2];
-    __m128 z        = _mm_set_ps1(0.);
-    __m128 ppt      = _mm_load_ps(&p->position[0]);
-    __m128 pp       = _mm_blend_ps(ppt, z, 0b1000);
-    __m128 pvt      = _mm_load_ps(&p->velocity[0]);
-    __m128 pv       = _mm_blend_ps(pvt, z, 0b1000);
-    __m128 fdt      = _mm_load_ps(&f_data[0]);
-    __m128 fd       = _mm_blend_ps(fdt, z, 0b1000);
-
-    float d   = f_data[3];
-    float dec = f_data[4];
-    float d2 = d * d;
-    //float n0  = pp0-fd0;
-    //float n1  = pp1-fd1;
-    //float n2  = pp2-fd2;
-    __m128 n        = _mm_sub_ps(pp, fd);
-
-    //float r2 = n0*n0 + n1*n1 + n2*n2;
-    __m128 r2m      = _mm_mul_ps(n,n);
-    __m128 r2t      = _mm_hadd_ps(r2m,r2m);
-    __m128 r2       = _mm_hadd_ps(r2t,r2t);
-
-    //float vnormal = n0*pv0 + n1*pv1 + n2*pv2;
-    __m128 vntt     = _mm_mul_ps(pv, n);
-    __m128 vnt      = _mm_hadd_ps(vntt,vntt);
-    __m128 vn       = _mm_hadd_ps(vnt,vnt);
-
-    //float r2_reci = 1.0f / r2;
-    __m128 r2_reci  = _mm_div_ps(_mm_set_ps1(1.0),r2);
-    float r2s, vns;
-    _mm_store_ss(&r2s,r2);
-    _mm_store_ss(&vns, vn);
-    if(d2 > r2s && vns < 0.0f) {
-        // inside sphere and going further inside sphere:
-        //float r_reci = sqrtf(r2_reci);
-        __m128 r_reci   = _mm_sqrt_ps(r2_reci);
-
-        //float vnormal2_r2 = 2.0f * vnormal * r2_reci;
-        __m128 vn2_r2t  = _mm_mul_ps(_mm_set_ps1(2.0), vn);
-        __m128 vn2_r2   = _mm_mul_ps(vn2_r2t, r2_reci);
-
-        //float pv0_1 = pv0 - vnormal2_r2*n0;
-        //float pv1_1 = pv1 - vnormal2_r2*n1;
-        //float pv2_1 = pv2 - vnormal2_r2*n2;
-
-        __m128 vn_n     = _mm_mul_ps(vn2_r2, n);
-        __m128 pvut     = _mm_sub_ps(pv, vn_n);
-
-        //float d_r_r_reci = d * r_reci - 1.0f;
-        __m128 dt           = _mm_load_ps1(&d);
-        __m128 d_reci_1t    = _mm_mul_ps(dt,r_reci);
-        __m128 d_reci_1     = _mm_sub_ps(d_reci_1t,_mm_set_ps1(1.0));
-
-        //p->velocity[0] = pv0_1 * dec;
-        //p->velocity[1] = pv1_1 * dec;
-        //p->velocity[2] = pv2_1 * dec;
-        __m128 vdec     = _mm_load_ps1(&dec);
-        __m128 pvu      = _mm_mul_ps(vdec, pvut);
-        __m128 pv4      = _mm_load_ps1(&p->velocity[3]);
-        __m128 pvus     = _mm_blend_ps(pvu, pv4, 0b1000);
-        _mm_store_ps(&p->velocity[0], pvus);
-
-        //p->position[0] = pp0 + d_r_r_reci*n0;
-        //p->position[1] = pp1 + d_r_r_reci*n1;
-        //p->position[2] = pp2 + d_r_r_reci*n2;
-        __m128 d_nt     = _mm_mul_ps(n, d_reci_1);
-        __m128 d_n      = _mm_add_ps(pp, d_nt);
-        __m128 pp4      = _mm_load_ps1(&p->position[3]);
-        __m128 ppu      = _mm_blend_ps(d_n, pp4, 0b1000);
-        _mm_store_ps(&p->position[0], ppu);
+    __m128 cnt0   = _mm_load_ps1(&f_data[0]);
+    __m128 cnt1   = _mm_load_ps1(&f_data[1]);
+    __m128 cnt2   = _mm_load_ps1(&f_data[2]);
+    __m128 d      = _mm_load_ps1(&f_data[3]);
+    __m128 dec    = _mm_load_ps1(&f_data[4]);
+    
+    __m128 d2     = _mm_mul_ps(d, d);
+    
+    __m128 z      = _mm_setzero_ps();
+    __m128 one    = _mm_set_ps1(1.0f);
+    __m128 two    = _mm_set_ps1(2.0f);
+    for (size_t k = 0; k < M; ++k) {
+        __m128 p0     = _mm_load_ps(&p[k].position[0][0]);
+        __m128 p1     = _mm_load_ps(&p[k].position[1][0]);
+        __m128 p2     = _mm_load_ps(&p[k].position[2][0]);
+        __m128 v0     = _mm_load_ps(&p[k].velocity[0][0]);
+        __m128 v1     = _mm_load_ps(&p[k].velocity[1][0]);
+        __m128 v2     = _mm_load_ps(&p[k].velocity[2][0]);
+        
+        __m128 nv0    = _mm_sub_ps(p0, cnt0);   // nv is not normalized. length = sqrt(r2)
+        __m128 nv1    = _mm_sub_ps(p1, cnt1);
+        __m128 nv2    = _mm_sub_ps(p2, cnt2);
+        
+        __m128 nv2_0  = _mm_mul_ps(nv0, nv0);
+        __m128 nv2_1  = _mm_mul_ps(nv1, nv1);
+        __m128 nv2_2  = _mm_mul_ps(nv2, nv2);
+        
+        __m128 nv0_x2 = _mm_mul_ps(nv0, two);
+        __m128 nv1_x2 = _mm_mul_ps(nv1, two);
+        __m128 nv2_x2 = _mm_mul_ps(nv2, two);
+        
+        __m128 r2_0   = _mm_add_ps(nv2_0, nv2_1);
+        __m128 r2     = _mm_add_ps(r2_0 , nv2_2);
+        
+        __m128 vd0    = _mm_mul_ps(v0, nv0);    // vd is longer by sqrt(r2)
+        __m128 vd1    = _mm_mul_ps(v1, nv1);
+        __m128 vd2    = _mm_mul_ps(v2, nv2);
+        
+        __m128 vnrm_0 = _mm_add_ps(vd0, vd1);
+        __m128 vnrm   = _mm_add_ps(vnrm_0, vd2);// vd is longer by sqrt(r2)
+        
+        __m128 dmask  = _mm_cmplt_ps(r2, d2);
+        __m128 vmask  = _mm_cmplt_ps(vnrm, z);
+        __m128 mask   = _mm_and_ps(dmask, vmask);// mask is true when particle should be modified
+        
+        // reciprocal with one newton step for accuracy:
+        __m128 r2_ra  = _mm_rcp_ps(r2);
+        __m128 r2_r2  = _mm_add_ps(r2_ra, r2_ra);
+        __m128 r4_ra  = _mm_mul_ps(r2_ra, r2_ra);
+        __m128 r2_r0  = _mm_mul_ps(r4_ra, r2);
+        __m128 r2_r   = _mm_sub_ps(r2_r2, r2_r0);
+        
+        __m128 r_r    = _mm_sqrt_ps(r2_r);
+        
+        __m128 dec_m  = _mm_blendv_ps(one, dec, mask);
+        
+        __m128 vn_m   = _mm_and_ps(mask, vnrm);
+        __m128 vn_r2r = _mm_mul_ps(vn_m, r2_r);
+        
+        __m128 d_r_r  = _mm_mul_ps(d, r_r);
+        __m128 d_r_r_m1= _mm_sub_ps(d_r_r, one);
+        
+        __m128 d_r_r_m1_m= _mm_and_ps(mask, d_r_r_m1);
+        
+        __m128 drr_n0 = _mm_mul_ps(d_r_r_m1_m, nv0);
+        __m128 drr_n1 = _mm_mul_ps(d_r_r_m1_m, nv1);
+        __m128 drr_n2 = _mm_mul_ps(d_r_r_m1_m, nv2);
+        
+        __m128 vnrm_2n0= _mm_mul_ps(vn_r2r, nv0_x2);
+        __m128 vnrm_2n1= _mm_mul_ps(vn_r2r, nv1_x2);
+        __m128 vnrm_2n2= _mm_mul_ps(vn_r2r, nv2_x2);
+        
+        __m128 v1_0   = _mm_sub_ps(v0, vnrm_2n0);
+        __m128 v1_1   = _mm_sub_ps(v1, vnrm_2n1);
+        __m128 v1_2   = _mm_sub_ps(v2, vnrm_2n2);
+        
+        __m128 p1_0   = _mm_add_ps(p0, drr_n0);
+        __m128 p1_1   = _mm_add_ps(p1, drr_n1);
+        __m128 p1_2   = _mm_add_ps(p2, drr_n2);
+        
+        __m128 v2_0   = _mm_mul_ps(v1_0, dec_m);
+        __m128 v2_1   = _mm_mul_ps(v1_1, dec_m);
+        __m128 v2_2   = _mm_mul_ps(v1_2, dec_m);
+        
+        _mm_store_ps(&p[k].position[0][0], p1_0);
+        _mm_store_ps(&p[k].position[1][0], p1_1);
+        _mm_store_ps(&p[k].position[2][0], p1_2);
+        _mm_store_ps(&p[k].velocity[0][0], v2_0);
+        _mm_store_ps(&p[k].velocity[1][0], v2_1);
+        _mm_store_ps(&p[k].velocity[2][0], v2_2);
     }
 }
 
-static void sphere_bounce_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
+static void sphere_bounce_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) dt;
-    float *data = data0;
-    float normal[3];
-    normal[0] = p->position[0]-data[0];
-    normal[1] = p->position[1]-data[1];
-    normal[2] = p->position[2]-data[2];
-    double r = sqrtf(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
-    normal[0] /= r;
-    normal[1] /= r;
-    normal[2] /= r;
-    float vnormal = normal[0]*p->velocity[0] + normal[1]*p->velocity[1] + normal[2]*p->velocity[2];
-    float d = data[3];
-    out->add += 7;
-    out->mul += 7;
-    out->div += 1;
-    out->loads += 11;
-    out->cmp += 1;
-    if(r<d) {
-        out->cmp += 1;
-        if (vnormal<0.0f) {
-            // branch is taken:
-            out->add += 7;
-            out->sqrt += 1;
-            out->mul += 12;
-            out->stores += 6;
-        }
-    } else {
-        // branch not taken.
-    }
+    out->add +=    M * 4 * 16;
+    out->mul +=    M * 4 * 22 + 1 * 4;
+    out->cmp +=    M * 4 * 2;
+    out->rcp +=    M * 4 * 1;
+    out->sqrt +=   M * 4 * 1;
+    out->loads +=  M * 4 * 6 + 5;
+    out->stores += M * 4 * 6;
 }
 
 static particle_effect_c_o3 sphere_bounce_effect(float x, float y, float z, float r, float a) {

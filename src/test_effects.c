@@ -87,7 +87,8 @@ int particle_condition_function(particle p, int test_case, float *data) {
             }
             break;
         case 6:
-        case 7: {
+        case 7:
+        case 8: {
                 // sphere bounce.
                 float normal[3];
                 normal[0] = p.position[0]-data[0];
@@ -99,16 +100,23 @@ int particle_condition_function(particle p, int test_case, float *data) {
                 normal[2] /= r;
                 float vnormal = normal[0]*p.velocity[0] + normal[1]*p.velocity[1] + normal[2]*p.velocity[2];
                 float d = data[3];
-                if (test_case == 5) {
+                if (test_case == 6) {
                     // all particles in front:
                     if(r<d) {
                         return -1;
                     } else {
                         return 0;
                     }
-                } else if (test_case == 6) {
+                } else if (test_case == 7) {
                     // all particles in back and moving to the back:
                     if(r<d && vnormal<0.0f) {
+                        return 0;
+                    } else {
+                        return -1;
+                    }
+                } else if (test_case == 8) {
+                    // all particles in back and moving to front:
+                    if(r<d && vnormal>0.0f) {
                         return 0;
                     } else {
                         return -1;
@@ -184,13 +192,16 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             }
             break;
         case 6:
-        case 7: {
+        case 7:
+        case 8: {
                 particle_array_create(arr);
-                return 1;
-                if (test_case == 5) {
+                //return 1;
+                if (test_case == 6) {
                     *out_description = "sphere bounce, all particles outside";
-                } else if (test_case == 6) {
+                } else if (test_case == 7) {
                     *out_description = "sphere bounce, all particles inside, moving to the center";
+                } else if (test_case == 8) {
+                    *out_description = "sphere bounce, all particles inside, moving to outside";
                 }
                 float sphere_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1), randf(0,1)};
                 // sphere bounce, all particles in front:
@@ -199,7 +210,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
                 return 0;
             }
             break;
-        case 8:
+        case 9:
             particle_array_create(arr);
             return 1;
             // pairwise gravity:
@@ -208,8 +219,8 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             add_random_particles(arr, 200);
             return 0;
             break;
-        case 9:
         case 10:
+        case 11:
             particle_array_create(arr);
             return 1;
             // pairwise collision:
@@ -218,7 +229,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             add_random_particles(arr, 200);
             return 0;
             break;
-        case 11:
+        case 12:
             particle_array_create(arr);
             return 1;
             // linear force:
