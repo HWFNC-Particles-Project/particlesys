@@ -57,7 +57,8 @@ int particle_condition_function(particle p, int test_case, float *data) {
             }
             break;
         case 3:
-        case 4: {
+        case 4:
+        case 5: {
                 // plane bounce.
                 float dist    = data[0]*p.position[0] + data[1]*p.position[1] + data[2]*p.position[2];
                 float vnormal = data[0]*p.velocity[0] + data[1]*p.velocity[1] + data[2]*p.velocity[2];
@@ -75,11 +76,18 @@ int particle_condition_function(particle p, int test_case, float *data) {
                     } else {
                         return -1;
                     }
+                } else if (test_case == 5) {
+                    // all particles in back and moving to the front:
+                    if(dist<data[3] && vnormal > 0.0f) {
+                        return 0;
+                    } else {
+                        return -1;
+                    }
                 }
             }
             break;
-        case 5:
-        case 6: {
+        case 6:
+        case 7: {
                 // sphere bounce.
                 float normal[3];
                 normal[0] = p.position[0]-data[0];
@@ -147,7 +155,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 2: {
                 // central force:
                 particle_array_create(arr);
-                //return 1;
+                return 1;
                 *out_description = "central force";
                 float cf_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1)};
                 effect_desc_add_central_force(effects,  cf_data[0], cf_data[1], cf_data[2], randf(0,1));
@@ -156,13 +164,17 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             }
             break;
         case 3:
-        case 4: {
+        case 4:
+        case 5: {
                 particle_array_create(arr);
-                return 1;
+                //return 1;
                 if (test_case == 3) {
                     *out_description = "plane bounce, all particles in front";
+                    //return 1;
                 } else if (test_case == 4) {
                     *out_description = "plane bounce, all particles in the back, moving away from back";
+                } else if (test_case == 5) {
+                    *out_description = "plane bounce, all particles in the back, moving towards front";
                 }
                 float plane_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1), randf(-1,1)};
                 // plane bounce, all particles in front:
@@ -171,8 +183,8 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
                 return 0;
             }
             break;
-        case 5:
-        case 6: {
+        case 6:
+        case 7: {
                 particle_array_create(arr);
                 return 1;
                 if (test_case == 5) {
@@ -187,7 +199,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
                 return 0;
             }
             break;
-        case 7:
+        case 8:
             particle_array_create(arr);
             return 1;
             // pairwise gravity:
@@ -196,8 +208,8 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             add_random_particles(arr, 200);
             return 0;
             break;
-        case 8:
         case 9:
+        case 10:
             particle_array_create(arr);
             return 1;
             // pairwise collision:
@@ -206,7 +218,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             add_random_particles(arr, 200);
             return 0;
             break;
-        case 10:
+        case 11:
             particle_array_create(arr);
             return 1;
             // linear force:
