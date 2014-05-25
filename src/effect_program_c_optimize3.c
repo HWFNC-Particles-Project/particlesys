@@ -358,11 +358,11 @@ static void linear_force_apply(reordered_particles *p, const void *data0, float 
 
 static void linear_force_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += M * 3 * 4;
-    out->mul += M * 3 * 4;
-    out->div += M * 1 * 4;
+    out->add += M * 4 * 3;
+    out->mul += M * 4 * 3;
+    out->div += M * 4 * 1;
     out->loads += 3 + M * 4 * 4;
-    out->stores +=    M * 3 * 4;
+    out->stores +=    M * 4 * 3;
 }
 
 static particle_effect_c_o3 linear_force_effect(float x, float y, float z) {
@@ -440,11 +440,11 @@ static void gravitational_force_apply(reordered_particles *p, const void *data0,
 
 static void gravitational_force_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += M * 4 * 10;
-    out->mul += M * 4 * 15 + 1;
-    out->rcp += M * 4 * 1;
-    out->sqrt += M * 4 * 1;
-    out->loads += M * 4 * 6 + 4;
+    out->add +=    M * 4 * 10;
+    out->mul +=    M * 4 * 15 + 1;
+    out->rcp +=    M * 4 * 1;
+    out->sqrt +=   M * 4 * 1;
+    out->loads +=  M * 4 * 6 + 4;
     out->stores += M * 4 * 3;
 }
 

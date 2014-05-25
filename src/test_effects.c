@@ -120,6 +120,12 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
     }
     *out_description = "none";
     switch(test_case) {
+        case -1:
+            particle_array_create(arr);
+            return 1;
+            *out_description = "overhead";
+            add_random_particles(arr, 1024);
+            return 0;
         case 0:
             // linear accel:
             particle_array_create(arr);
@@ -141,7 +147,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 2: {
                 // central force:
                 particle_array_create(arr);
-                return 1;
+                //return 1;
                 *out_description = "central force";
                 float cf_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1)};
                 effect_desc_add_central_force(effects,  cf_data[0], cf_data[1], cf_data[2], randf(0,1));
@@ -193,7 +199,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 8:
         case 9:
             particle_array_create(arr);
-            //return 1;
+            return 1;
             // pairwise collision:
             *out_description = "pairwise collision";
             effect_desc_add_sphere_collision(effects, randf(0,0.1), randf(0,1));
@@ -215,7 +221,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
 
 void test_effects_all(effect_program *test_program) {
     // first, determine approximate number of iterations to perform
-    int test_case = 0;
+    int test_case = -1;
     effect_program ref_program;
     effect_program_create_naive(&ref_program);
     while(1) {
@@ -242,8 +248,10 @@ void test_effects_all(effect_program *test_program) {
             // get performance:
             effect_program_perf_c(test_program, &arr, dt, &perf);
 
-            double freq = 1.8e9;
-            size_t cost = perf.add * 3 + perf.mul * 5 + perf.div * 11 + perf.cmp * 3 + perf.sqrt * 16 + perf.loads * 4 + perf.stores * 4;
+            //double freq = 1.8e9;
+            double freq = 3.4e9;
+            size_t cost = 75 * particle_array_size(&initial_arr) + 
+                          perf.add * 3 + perf.mul * 5 + perf.div * 11 + perf.rcp * 7 + perf.cmp * 3 + perf.sqrt * 16 + perf.loads * 4 + perf.stores * 4;
             size_t repeats = 10 * freq / cost;
 
             // verify:
