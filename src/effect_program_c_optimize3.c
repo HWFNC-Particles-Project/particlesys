@@ -151,7 +151,10 @@ void effect_program_c_o3_execute(const effect_program *self, particle_array *arr
     void *warray2_mem = NULL;
     reordered_particles *warray1 = malloc_align(M * sizeof(reordered_particles), 16, &warray1_mem);
     reordered_particles *warray2 = malloc_align(M * sizeof(reordered_particles), 16, &warray2_mem);
-    for(size_t i = 0; i < arr->size; i += M * 4) {
+    if (arr->size % (M * 4) != 0) {
+        printf("error: particle array size must be a multiple of %d!\n", (int)(M * 4));
+    }
+    for(size_t i = 0; i + M * 4 - 1 < arr->size; i += M * 4) {
         // load particles into working array:
         for(size_t k = 0; k < M; ++k) {
             size_t base = i + k * 4;
