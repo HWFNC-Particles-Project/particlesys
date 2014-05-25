@@ -8,7 +8,7 @@
 #include <smmintrin.h>
 #include "malloc_align.h"
 
-#define M 1
+#define M 8
 
 typedef struct reordered_particles_t {
     float position[3][4];
@@ -51,7 +51,7 @@ static particle_effect_c_o3 pairwise_sphere_collision_effect(float radius, float
 static particle_effect_c_o3 newton_step_effect();
 
 
-int effect_program_create_c_optimze2(effect_program *p) {
+int effect_program_create_c_optimze3(effect_program *p) {
     memset(p, 0, sizeof(effect_program));
     p->compile = effect_program_c_o3_compile;
     p->execute = effect_program_c_o3_execute;
@@ -151,16 +151,34 @@ void effect_program_c_o3_execute(const effect_program *self, particle_array *arr
         // load particles into working array:
         for(size_t k = 0; k < M; ++k) {
             size_t base = i + k * 4;
+            __m128 wa_p0;
+            __m128 wa_p1;
+            __m128 wa_p2;
+            __m128 wa_m;
+            __m128 wa_v0;
+            __m128 wa_v1;
+            __m128 wa_v2;
+            __m128 wa_c;
             for(size_t j = 0; j < 4; ++j) {
-                warray1[k].position[0][j] = arr->particles[base + j].position[0];
-                warray1[k].position[1][j] = arr->particles[base + j].position[1];
-                warray1[k].position[2][j] = arr->particles[base + j].position[2];
-                warray1[k].mass    [0][j] = arr->particles[base + j].mass;
-                warray1[k].velocity[0][j] = arr->particles[base + j].velocity[0];
-                warray1[k].velocity[1][j] = arr->particles[base + j].velocity[1];
-                warray1[k].velocity[2][j] = arr->particles[base + j].velocity[2];
-                warray1[k].charge  [0][j] = arr->particles[base + j].charge;
+                __m128 p_l = _mm_load_ps(&arr->particles[base + j].position[0]);
+                __m128 p_h = _mm_load_ps(&arr->particles[base + j].velocity[0]);
+                wa_p0 = _mm_insert_ps(wa_p0, p_l, j << 4 | 0 << 6);
+                wa_p1 = _mm_insert_ps(wa_p1, p_l, j << 4 | 1 << 6);
+                wa_p2 = _mm_insert_ps(wa_p2, p_l, j << 4 | 2 << 6);
+                wa_m  = _mm_insert_ps(wa_m , p_l, j << 4 | 3 << 6);
+                wa_v0 = _mm_insert_ps(wa_v0, p_h, j << 4 | 0 << 6);
+                wa_v1 = _mm_insert_ps(wa_v1, p_h, j << 4 | 1 << 6);
+                wa_v2 = _mm_insert_ps(wa_v2, p_h, j << 4 | 2 << 6);
+                wa_c  = _mm_insert_ps(wa_c , p_h, j << 4 | 3 << 6);
             }
+            _mm_store_ps(&warray1[k].position[0][0], wa_p0);
+            _mm_store_ps(&warray1[k].position[1][0], wa_p1);
+            _mm_store_ps(&warray1[k].position[2][0], wa_p2);
+            _mm_store_ps(&warray1[k].mass    [0][0], wa_m);
+            _mm_store_ps(&warray1[k].velocity[0][0], wa_v0);
+            _mm_store_ps(&warray1[k].velocity[1][0], wa_v1);
+            _mm_store_ps(&warray1[k].velocity[2][0], wa_v2);
+            _mm_store_ps(&warray1[k].charge  [0][0], wa_c);
         }
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if(effects[j].particles == 1) {
@@ -180,10 +198,42 @@ void effect_program_c_o3_execute(const effect_program *self, particle_array *arr
                 arr->particles[base + j].position[2] = warray1[k].position[2][j];
                 //arr->particles[base + j].mass        = warray1[k].mass    [0][j]; // cannot change mass
                 arr->particles[base + j].velocity[0] = warray1[k].velocity[0][j];
-                arr->particles[base + j].velocity[0] = warray1[k].velocity[1][j];
-                arr->particles[base + j].velocity[0] = warray1[k].velocity[2][j];
+                arr->particles[base + j].velocity[1] = warray1[k].velocity[1][j];
+                arr->particles[base + j].velocity[2] = warray1[k].velocity[2][j];
                 //arr->particles[base + j].charge      = warray1[k].charge  [0][j]; // cannot change charge
             }
+            /*
+            size_t base = i + k * 4;
+            __m128 wa_p0;
+            __m128 wa_p1;
+            __m128 wa_p2;
+            __m128 wa_m;
+            __m128 wa_v0;
+            __m128 wa_v1;
+            __m128 wa_v2;
+            __m128 wa_c;
+            wa_p0 = _mm_load_ps(&warray1[k].position[0][0]);
+            wa_p1 = _mm_load_ps(&warray1[k].position[1][0]);
+            wa_p2 = _mm_load_ps(&warray1[k].position[2][0]);
+            wa_m  = _mm_load_ps(&warray1[k].mass    [0][0]);
+            wa_v0 = _mm_load_ps(&warray1[k].velocity[0][0]);
+            wa_v1 = _mm_load_ps(&warray1[k].velocity[1][0]);
+            wa_v2 = _mm_load_ps(&warray1[k].velocity[2][0]);
+            wa_c  = _mm_load_ps(&warray1[k].charge  [0][0]);
+            for(size_t j = 0; j < 4; ++j) {
+                __m128 p_l;
+                __m128 p_h;
+                p_l = _mm_insert_ps(p_l, wa_p0, j << 6 | 0 << 4);
+                p_l = _mm_insert_ps(p_l, wa_p1, j << 6 | 1 << 4);
+                p_l = _mm_insert_ps(p_l, wa_p2, j << 6 | 2 << 4);
+                p_l = _mm_insert_ps(p_l, wa_m , j << 6 | 3 << 4);
+                p_h = _mm_insert_ps(p_h, wa_v0, j << 6 | 0 << 4);
+                p_h = _mm_insert_ps(p_h, wa_v1, j << 6 | 1 << 4);
+                p_h = _mm_insert_ps(p_h, wa_v2, j << 6 | 2 << 4);
+                p_h = _mm_insert_ps(p_h, wa_c , j << 6 | 3 << 4);
+                _mm_store_ps(&arr->particles[base + j].position[0], p_l);
+                _mm_store_ps(&arr->particles[base + j].velocity[0], p_h);
+            }*/
         }
     }
     free(warray1_mem);
@@ -282,7 +332,7 @@ static particle_effect_c_o3 linear_accel_effect(float x, float y, float z) {
     return result;
 }
 
-static void linear_force_apply(particle *p, const void *data0, float dt) {
+static void linear_force_apply(reordered_particles *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
     __m128 dtv    = _mm_set_ps1(dt);
     __m128 f0     = _mm_load_ps1(&f_data[0]);
@@ -306,7 +356,7 @@ static void linear_force_apply(particle *p, const void *data0, float dt) {
     }
 }
 
-static void linear_force_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
+static void linear_force_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
     out->add += M * 3 * 4;
     out->mul += M * 3 * 4;
