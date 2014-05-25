@@ -12,7 +12,7 @@
 
 #define DT 0.01f
 
-#define RULE_DUPLICATION 1
+#define RULE_DUPLICATION 8
 
 void verify(const effect_program *test_program, const effect_program *ref_program, const particle_array *initial_arr);
 
@@ -353,9 +353,9 @@ void test_effects_all(effect_program *test_program) {
             
             performance_count total = perf;
             double part_iteration = (double)particle_array_size(&initial_arr);
-            printf("time:        %8.6f\n", time);
-            printf("speedup:     %8.1f\n", cycles_ref / cycles);
-            printf("cycles:      %8.2f\n", (cycles / part_iteration));
+            printf("time:           %8.4fms\n", time * 1000.0);
+            printf("speedup:     %8.1fx\n", cycles_ref / cycles);
+            printf("cycles:      %8.1f\n", (cycles / part_iteration));
             //printf("cycles/add:  %8.2f\n", cycles / (double)total.add);
             //printf("cycles/cmp:  %8.2f\n", cycles / (double)total.cmp);
             //printf("cycles/mul:  %8.2f\n", cycles / (double)total.mul);
@@ -363,15 +363,14 @@ void test_effects_all(effect_program *test_program) {
             //printf("cycles/sqrt: %8.2f\n", cycles / (double)total.sqrt);
             //printf("cycles/lds:  %8.2f\n", cycles / (double)total.loads);
             //printf("cycles/sts:  %8.2f\n", cycles / (double)total.stores);
-            printf("add:         %8.2f\n", (double)total.add / part_iteration);
-            printf("cmp:         %8.2f\n", (double)total.cmp / part_iteration);
-            printf("mul:         %8.2f\n", (double)total.mul / part_iteration);
-            printf("div:         %8.2f\n", (double)total.div / part_iteration);
-            printf("rcp:         %8.2f\n", (double)total.rcp / part_iteration);
-            printf("sqrt:        %8.2f\n", (double)total.sqrt / part_iteration);
-            printf("rsqrt:       %8.2f\n", (double)total.rsqrt / part_iteration);
-            printf("lds:         %8.2f\n", (double)total.loads / part_iteration);
-            printf("sts:         %8.2f\n", (double)total.stores / part_iteration);
+            printf("add:         %8.1fpp %6.2fop/cycle\n", (double)total.add / part_iteration,    (double)total.add / cycles);
+            printf("cmp:         %8.1fpp %6.2fop/cycle\n", (double)total.cmp / part_iteration,    (double)total.cmp / cycles);
+            printf("mul:         %8.1fpp %6.2fop/cycle\n", (double)total.mul / part_iteration,    (double)total.mul / cycles);
+            printf("div:         %8.1fpp %6.2fop/cycle\n", (double)total.div / part_iteration,    (double)total.div / cycles);
+            printf("rcp:         %8.1fpp %6.2fop/cycle\n", (double)total.rcp / part_iteration,    (double)total.rcp / cycles);
+            printf("sqrt:        %8.1fpp %6.2fop/cycle\n", (double)total.sqrt / part_iteration,   (double)total.sqrt / cycles);
+            printf("lds:         %8.1fpp %6.2fop/cycle\n", (double)total.loads / part_iteration,  (double)total.loads / cycles);
+            printf("sts:         %8.1fpp %6.2fop/cycle\n", (double)total.stores / part_iteration, (double)total.stores / cycles);
         }
 
         effect_desc_destroy(&effects);
