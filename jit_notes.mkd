@@ -1,0 +1,100 @@
+JIT notes
+=========
+
+The particle jit compiler compiles sequences of expressions into
+x86 machine code. It does not offer explicit flow control but minor
+branching can be emulated by masking.
+
+Parser
+------
+
+The source can be written in a C-style syntax that understands a
+subset of the operators available in C. Each line has to assign a
+value to either a temporary variable or a in/out-put location
+which are specified by an index enclosed in brackets.
+
+Example:
+
+    dt = [8]
+    x = [9]
+    y = [10]
+    z = [11]
+    mu = [12]
+    diffx = [0]-x
+    diffy = [1]-y
+    diffz = [2]-z
+    r = 1.0/sqrt(diffx*diffx + diffy*diffy + diffz*diffz)
+    r3 = r*r*r
+    [4] = [4] + dt*mu*diffx*r3
+    [5] = [5] + dt*mu*diffy*r3
+    [6] = [6] + dt*mu*diffz*r3
+
+Terminating semicolons are neither required nor even allowed since the
+parser can decided the end of expressions without them.
+
+The parser is implemented as a simple single pass recursive descent
+parser and directly translates to SSA form.
+
+Intermediate Representation (SSA)
+---------------------------------
+
+All optimizations are performed on a SSA representation. Each SSA
+node is stored as a `uint64_t` where the first 16bit specify the
+the operation and the following three 16bit blocks specify the arguments
+as indices of previous SSA instructions.
+In addition the SSA container structure maintains a remapping table
+that allows in-place remapping of arguments to accomodate for code
+movement and replacement.
+
+Generic Optimization Passes
+---------------------------
+
+The JIT is capable of the following basic optimizations on the SSA form:
+
+* elimination of redundant loads and stores to memory
+* constant folding (for some operations)
+* common subexpression elimination
+    * accelerated using a hash table to operate in O(N) time as opposed to the naive O(N^2)
+* dead code removal
+* heuristics based scheduling
+    * prioritize instructions on the critical path according to a latency table
+    * prioritize instructions that reduce register pressure if pressure is already high
+
+Code Generation
+---------------
+
+Three code generators are present:
+
+* a scalar code generator operating on one particle at a time
+* 128bit wide vector code generator operating on 4 particles at a time
+* 256bit wide vector code generator operating on 8 particles at a time
+
+They take a block of SSA IR as argument and return function pointer
+to a new function using the System V calling convention
+(http://www.x86-64.org/documentation/abi.pdf).
+
+All three generators use strictly VEX encoded instructions and therefore
+require and AVX capable CPU. The reasoning behind this choice is the
+ability to use the non-destructive 3-operand encoding which corresponds
+more directly to the SSA IR. Using the legacy SSE encoding would require
+insertion of additional MOV instructions otherwise.
+
+Since there is no flow control there is also only a single basic block.
+Register allocation is therefore straight forward (just push/pull them
+from a pool of currently free ones). In case not enough registers
+are available intermediates are spilled to the stack based on which
+of the currently held operands will be used last.
+
+The actual encoding of the x86-64 instructions is provided by PLASM
+(https://github.com/progschj/plasm).
+
+Miscellaneous
+-------------
+
+Debuggers and profilers (gdb/perf/vtune) are not capable of dealing with
+the jitted functions. Perf for example just provides no info and attributes
+all the running time to some instruction near the indirect call.
+
+During some tests INSERTPS instructions were used instead of the VEX encoded
+VINSERTPS. Mixing these encodings resulted in a drastic performance drop
+of about a factor 5.
