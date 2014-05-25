@@ -991,22 +991,33 @@ static particle_effect_c_o3 pairwise_sphere_collision_effect(float radius, float
 
 static void newton_step_apply(particle *p, const void *data0, float dt) {
     (void) data0;
-    __m128 z    = _mm_set_ps1(0.);
-    __m128 pp   = _mm_load_ps(&p->position[0]);
-    __m128 pv   = _mm_load_ps(&p->velocity[0]);
-    __m128 vdt   = _mm_load_ps1(&dt);
-    __m128 ps   = _mm_mul_ps(pv, vdt);
-    __m128 ps_c = _mm_blend_ps(ps, z, 0b1000);
-    __m128 n_pp = _mm_add_ps(pp, ps_c);
-    _mm_store_ps(&p->position[0], n_pp);
+    const float *f_data = (const float *)data0;
+    __m128 dtv    = _mm_set_ps1(dt);
+    for (size_t k = 0; k < M; ++k) {
+        __m128 v0     = _mm_load_ps(&p[k].velocity[0][0]);
+        __m128 v1     = _mm_load_ps(&p[k].velocity[1][0]);
+        __m128 v2     = _mm_load_ps(&p[k].velocity[2][0]);
+        __m128 p0     = _mm_load_ps(&p[k].position[0][0]);
+        __m128 p1     = _mm_load_ps(&p[k].position[1][0]);
+        __m128 p2     = _mm_load_ps(&p[k].position[2][0]);
+        __m128 dt_v0  = _mm_mul_ps(dtv, v0);
+        __m128 dt_v1  = _mm_mul_ps(dtv, v1);
+        __m128 dt_v2  = _mm_mul_ps(dtv, v2);
+        __m128 p1_0   = _mm_add_ps(p0 , dt_v0);
+        __m128 p1_1   = _mm_add_ps(p1 , dt_v1);
+        __m128 p1_2   = _mm_add_ps(p2 , dt_v2);
+        _mm_store_ps(&p[k].position[0][0], p1_0);
+        _mm_store_ps(&p[k].position[1][0], p1_1);
+        _mm_store_ps(&p[k].position[2][0], p1_2);
+    }
 }
 
 static void newton_step_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += 3;
-    out->mul += 3;
-    out->loads += 6;
-    out->stores += 3;
+    out->add +=    M * 4 * 3;
+    out->mul +=    M * 4 * 3;
+    out->loads +=  M * 4 * 6;
+    out->stores += M * 4 * 3;
 }
 
 static particle_effect_c_o3 newton_step_effect() {
