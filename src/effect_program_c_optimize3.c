@@ -110,23 +110,29 @@ void effect_program_c_o3_compile(effect_program *self, const effect_desc *desc) 
                                                         el->float_usr[4]);
                 break;
             case EFFECT_TYPE_SPHERE_BOUNCE:
-                effects[i] = sphere_bounce_effect(      el->float_usr[0],
+                printf("error: sphere bounce not implemented!\n");
+                /*effects[i] = sphere_bounce_effect(      el->float_usr[0],
                                                         el->float_usr[1],
                                                         el->float_usr[2],
                                                         el->float_usr[3],
-                                                        el->float_usr[4]);
+                                                        el->float_usr[4]);*/
+                effects[i] = linear_accel_effect(0,0,0);
                 break;
             case EFFECT_TYPE_NEWTON_STEP:
                 effects[i] = newton_step_effect();
                 break;
 
             case EFFECT_TYPE_GRAVITY_FORCE:
-                effects[i] = pairwise_gravitational_force_effect(el->float_usr[0]);
+                printf("error: gravity force not implemented!\n");
+                //effects[i] = pairwise_gravitational_force_effect(el->float_usr[0]);
+                effects[i] = linear_accel_effect(0,0,0);
                 break;
 
             case EFFECT_TYPE_SPHERE_COLLISION:
-                effects[i] = pairwise_sphere_collision_effect(  el->float_usr[0],
-                                                                el->float_usr[1]);
+                printf("error: sphere collision not implemented!\n");
+                //effects[i] = pairwise_sphere_collision_effect(  el->float_usr[0],
+                //                                                el->float_usr[1]);
+                effects[i] = linear_accel_effect(0,0,0);
                 break;
             default:
                 break; // unhandled effect
@@ -989,7 +995,7 @@ static particle_effect_c_o3 pairwise_sphere_collision_effect(float radius, float
     return result;
 }
 
-static void newton_step_apply(particle *p, const void *data0, float dt) {
+static void newton_step_apply(reordered_particles *p, const void *data0, float dt) {
     (void) data0;
     const float *f_data = (const float *)data0;
     __m128 dtv    = _mm_set_ps1(dt);
@@ -1012,7 +1018,7 @@ static void newton_step_apply(particle *p, const void *data0, float dt) {
     }
 }
 
-static void newton_step_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
+static void newton_step_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
     out->add +=    M * 4 * 3;
     out->mul +=    M * 4 * 3;
