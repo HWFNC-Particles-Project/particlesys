@@ -23,5 +23,9 @@ void dump_code(void *fun) {
     fclose(fp);
     if(system("ndisasm -b 64 out.bin")) {
         printf("ndisasm not available?\n");
+        // fall back to objdump
+        if(system("objdump -b binary -m i386:x86-64 -D out.bin")) {
+            printf("objdump not available?\n");
+        }
     }
 }

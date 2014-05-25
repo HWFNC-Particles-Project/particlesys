@@ -36,30 +36,107 @@ static uint8_t cmpimm[] = {
 };
 
 typedef struct {
-    int *regs, *uses, *free_regs, *locked, *owner;
+    size_t pos;
+    int *regs, *stackpos, *uses, *free_regs, *locked, *owner;
     int top, spillpos;
     unsigned increment;
     plasm *as;
     ssa_block *block;
+    int *start, *graph;
 } codegen_data;
 
-static void spill_operand(codegen_data *data) {
-    int j = 15;
-    for(;j>=0;--j) {
-        if(data->owner[j]>=0 && !data->locked[j])
-            break;
-    }
-    int i = data->owner[j];
+static void gather4(codegen_data *data, opspec_t target, opspec_t idx, int offset, int stride) {
+    plasm_put_op(data->as, VINSERTPS, target, target, MEM(idx, offset+0*stride), IMM8(0x00));
+    plasm_put_op(data->as, VINSERTPS, target, target, MEM(idx, offset+1*stride), IMM8(0x10));
+    plasm_put_op(data->as, VINSERTPS, target, target, MEM(idx, offset+2*stride), IMM8(0x20));
+    plasm_put_op(data->as, VINSERTPS, target, target, MEM(idx, offset+3*stride), IMM8(0x30));
+}
 
+static void scatter4(codegen_data *data, opspec_t source, opspec_t idx, int offset, int stride) {
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+0*stride), source, IMM8(0));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+1*stride), source, IMM8(1));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+2*stride), source, IMM8(2));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+3*stride), source, IMM8(3));
+}
+
+static void gather8(codegen_data *data, int regidx, opspec_t idx, int offset, int stride) {
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+4*stride), IMM8(0x00));
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+5*stride), IMM8(0x10));
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+6*stride), IMM8(0x20));
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+7*stride), IMM8(0x30));
+
+    plasm_put_op(data->as, VINSERTF128, YMM(regidx), YMM(regidx), XMM(regidx), IMM8(1));
+
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+0*stride), IMM8(0x00));
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+1*stride), IMM8(0x10));
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+2*stride), IMM8(0x20));
+    plasm_put_op(data->as, VINSERTPS, XMM(regidx), XMM(regidx), MEM(idx, offset+3*stride), IMM8(0x30));
+}
+
+static void scatter8(codegen_data *data, int regidx, opspec_t idx, int offset, int stride) {
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+0*stride), XMM(regidx), IMM8(0));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+1*stride), XMM(regidx), IMM8(1));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+2*stride), XMM(regidx), IMM8(2));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+3*stride), XMM(regidx), IMM8(3));
+
+    plasm_put_op(data->as, VEXTRACTF128, XMM(regidx), YMM(regidx), IMM8(1));
+
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+4*stride), XMM(regidx), IMM8(0));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+5*stride), XMM(regidx), IMM8(1));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+6*stride), XMM(regidx), IMM8(2));
+    plasm_put_op(data->as, VEXTRACTPS, MEM(idx, offset+7*stride), XMM(regidx), IMM8(3));
+}
+
+static int next_use(codegen_data *data, int i, int pos) {
+    for(size_t j = data->start[i];j<data->start[i+1];++j) {
+        if(data->graph[j]>pos) {
+            return data->graph[j];
+        }
+    }
+    return -1;
+}
+
+static opspec_t evict_operand(codegen_data *data, int i) {
     opspec_t src = XMM(data->regs[i]-1);
 
     data->free_regs[data->top++] = data->regs[i];
     data->owner[data->regs[i]-1] = -1;
 
-    data->regs[i] = data->spillpos--;
+    if(data->stackpos[i] == 0) {
+        data->stackpos[i] = data->spillpos--;
+        data->regs[i] = data->stackpos[i];
+        opspec_t dest = MEM(RSP, 16*(data->regs[i]));
+        plasm_put_op(data->as, VMOVUPS, dest, src);
+    } else {
+        data->regs[i] = data->stackpos[i];
+    }
+    return src;
+}
 
-    opspec_t dest = MEM(RSP, 4*(data->regs[i]));
-    plasm_put_op(data->as, VMOVSS, dest, src);
+static opspec_t spill_operand(codegen_data *data) {
+    int i = 0;
+    int next = 0;
+    for(int j = 0;j<16;++j) {
+        if(data->owner[j]>=0 && !data->locked[j]) {
+            int use = next_use(data, data->owner[j], data->pos);
+            if(data->stackpos[data->owner[j]] != 0) {
+                use += 1000;
+            }
+            if(use>next) {
+                next = use;
+                i = data->owner[j];
+            }
+        }
+    }
+
+    return evict_operand(data, i);
+}
+
+static opspec_t allocate_temp_register(codegen_data *data) {
+    if(data->top <= 0) {
+        return spill_operand(data);
+    }
+    return XMM(data->free_regs[data->top-1]-1);
 }
 
 static opspec_t allocate_operand(codegen_data *data, int i) {
@@ -71,35 +148,30 @@ static opspec_t allocate_operand(codegen_data *data, int i) {
     return XMM(data->regs[i]-1);
 }
 
-static opspec_t calc_mem(codegen_data *data, int i) {
-    uint64_t src = data->block->buffer[i];
-    if(GET_OP(src) == SSA_LOAD) {
-        if(GET_ARG1(src)<data->increment) {
-            return MEM(RDI, 4*(GET_ARG1(src)));
-        } else {
-            return MEM(RSI, 4*(GET_ARG1(src)-data->increment));
-        }
-    } else if(GET_OP(src) == SSA_STORE) {
-        if(GET_ARG2(src)<data->increment) {
-            return MEM(RDI, 4*(GET_ARG2(src)));
-        } else {
-            return MEM(RSI, 4*(GET_ARG2(src)-data->increment));
-        }
-    } else {
-        return MEM(RSP, 4*(data->regs[i]));
-    }
-}
-
 static opspec_t lock_operand(codegen_data *data, int i, int mem) {
     if(data->regs[i]>0) {
         data->locked[data->regs[i]-1] = 1;
         return XMM(data->regs[i]-1);
-    } else if(mem) {
-        return calc_mem(data, i);
     } else {
-        opspec_t source = calc_mem(data, i);
-        opspec_t target = allocate_operand(data, i);
-        plasm_put_op(data->as, VMOVSS, target, source);
+        uint64_t src = data->block->buffer[i];
+        uint64_t location = data->regs[i];
+
+        opspec_t target;
+        if(GET_OP(src) == SSA_LOAD) {
+            target = allocate_operand(data, i);
+            if(GET_ARG1(src)<data->increment) {
+                gather4(data, target, RDI, 4*GET_ARG1(src), 4*data->increment);
+            } else {
+                plasm_put_op(data->as, VBROADCASTSS, target, MEM(RSI, 4*(GET_ARG1(src)-data->increment)));
+            }
+        } else {
+            if(mem) {
+                return MEM(RSP, 16*location);
+            } else {
+                target = allocate_operand(data, i);
+                plasm_put_op(data->as, VMOVUPS, target, MEM(RSP, 16*location));
+            }
+        }
         data->locked[data->regs[i]-1] = 1;
         return target;
     }
@@ -117,22 +189,58 @@ static void release_operand(codegen_data *data, int i) {
 
 void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int)  {
     int uses[block->size];
+    int total_uses = 0;
     for(size_t i = 0;i<block->size;++i) {
         uint64_t op = block->buffer[i];
         uses[i] = 0;
         if(IS_UNARY(op)) {
             ++uses[GET_ARG1(op)];
+            total_uses += 1;
         } else if(IS_BINARY(op)) {
             ++uses[GET_ARG1(op)];
             ++uses[GET_ARG2(op)];
+            total_uses += 2;
         } else if(IS_TERNARY(op)) {
             ++uses[GET_ARG1(op)];
             ++uses[GET_ARG2(op)];
             ++uses[GET_ARG3(op)];
+            total_uses += 3;
         }
     }
 
+    int start[block->size+1];
+    start[block->size] = total_uses;
+
+    int dependencies[block->size];
+    int graph[total_uses];
+    int sum = 0;
+    for(size_t i = 0;i<block->size;++i) {
+        start[i] = sum;
+        sum += uses[i];
+        dependencies[i] = 0;
+        uint64_t op = block->buffer[i];
+        if(IS_UNARY(op)) {
+            graph[start[GET_ARG1(op)]++] = i;
+            dependencies[i] = 1;
+        } else if(IS_BINARY(op)) {
+            graph[start[GET_ARG1(op)]++] = i;
+            graph[start[GET_ARG2(op)]++] = i;
+            dependencies[i] = 2;
+        } else if(IS_TERNARY(op)) {
+            graph[start[GET_ARG1(op)]++] = i;
+            graph[start[GET_ARG2(op)]++] = i;
+            graph[start[GET_ARG3(op)]++] = i;
+            dependencies[i] = 3;
+        }
+    }
+    sum = 0;
+    for(size_t i = 0;i<block->size;++i) {
+        start[i] = sum;
+        sum += uses[i];
+    }
+
     int regs[block->size];
+    int stackpos[block->size];
     int free_regs[16] = {16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1};
     int locked[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     int owner[16] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
@@ -147,7 +255,7 @@ void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int
     plasm_init(&as, buffer, chunksize-sizeof(binary_header));
     void (*fun)(float*, float*, int) = (void(*)(float*, float*, int))plasm_get_current_ptr(&as);
 
-    codegen_data data = {regs, uses, free_regs, locked, owner, top, -1, increment, &as, block};
+    codegen_data data = {0, regs, stackpos, uses, free_regs, locked, owner, top, -1, increment, &as, block, start, graph};
 
     float *constbase = (float*)(((uint8_t*)chunk) + chunksize);
     int constindex = -1;
@@ -164,13 +272,14 @@ void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int
 
     for(size_t i = 0;i<block->size;++i) {
         regs[i] = 0;
+        stackpos[i] = 0;
         uint64_t op = block->buffer[i];
         if(GET_OP(op) == SSA_LOAD) {
 
         } else if(GET_OP(op) == SSA_STORE) {
             opspec_t source = lock_operand(&data, GET_ARG1(op), 0);
 
-            plasm_put_op(&as, VMOVSS, calc_mem(&data, i), source);
+            scatter4(&data, source, RDI, 4*GET_ARG2(op), 4*increment);
 
             release_operand(&data, GET_ARG1(op));
         } else if(GET_OP(op) == SSA_CONST) {
@@ -178,7 +287,7 @@ void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int
 
             *(constbase+constindex) = GET_CONST(op);
 
-            plasm_put_op(&as, VMOVSS, target, MEM(RAX, 4*constindex));
+            plasm_put_op(&as, VBROADCASTSS, target, MEM(RAX, 4*constindex));
             --constindex;
 
         } else if(IS_COMPARISON(op)) {
@@ -188,7 +297,7 @@ void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int
             opspec_t src2 = lock_operand(&data, arg2, 1);
             opspec_t target = allocate_operand(&data, i);
 
-            plasm_put_op(&as, VCMPSS, target, src1, src2, IMM8(cmpimm[GET_OP(op)]));
+            plasm_put_op(&as, VCMPPS, target, src1, src2, IMM8(cmpimm[GET_OP(op)]));
 
             release_operand(&data, arg2);
             release_operand(&data, arg1);
@@ -197,7 +306,7 @@ void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int
             opspec_t src1 = lock_operand(&data, arg1, 1);
             opspec_t target = allocate_operand(&data, i);
 
-            plasm_put_op(&as, ssa2asm_ss[GET_OP(op)], target, target, src1);
+            plasm_put_op(&as, ssa2asm_ss[GET_OP(op)], target, src1);
 
             release_operand(&data, arg1);
         } else if(IS_BINARY(op)) {
@@ -220,7 +329,7 @@ void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int
             int arg3 = GET_ARG3(op);
 
             opspec_t src1 = lock_operand(&data, arg1, 0);
-            opspec_t src2 = lock_operand(&data, arg2, 0);
+            opspec_t src2 = lock_operand(&data, arg2, 1);
             opspec_t src3 = lock_operand(&data, arg3, 0);
             opspec_t target = allocate_operand(&data, i);
 
@@ -232,7 +341,7 @@ void (*gencode_avx_ps(ssa_block *block, unsigned increment))(float*, float*, int
         }
     }
 
-    plasm_put_op(&as, ADD, RDI, IMM8(8*4*increment));
+    plasm_put_op(&as, ADD, RDI, IMM32(4*4*increment));
     plasm_put_op(&as, CMP, RDI, RDX);
     int32_t *reloff_ptr;
     plasm_put_op(&as, JNE, VALUE_PTR(REL32(0), &reloff_ptr));

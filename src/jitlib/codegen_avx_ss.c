@@ -46,7 +46,7 @@ typedef struct {
     int *start, *graph;
 } codegen_data;
 
-int next_use(codegen_data *data, int i, int pos) {
+static int next_use(codegen_data *data, int i, int pos) {
     for(size_t j = data->start[i];j<data->start[i+1];++j) {
         if(data->graph[j]>pos) {
             return data->graph[j];
@@ -183,17 +183,6 @@ void (*gencode_avx_ss(ssa_block *block, unsigned increment))(float*, float*, int
         start[i] = sum;
         sum += uses[i];
     }
-
-    //~ for(size_t i = 0;i<block->size;++i) {
-        //~ printf("%d %d %d ", (int)i, dependencies[i], uses[i]);
-        //~ ssa_print_op(block, i);
-        //~ printf("\t\t\t");
-//~
-        //~ for(size_t j = start[i];j<start[i+1];++j) {
-            //~ printf(" %d", graph[j]);
-        //~ }
-        //~ printf("\n");
-    //~ }
 
     int regs[block->size];
     int free_regs[16] = {16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1};
