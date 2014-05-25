@@ -463,49 +463,80 @@ static particle_effect_c_o3 gravitational_force_effect(float x, float y, float z
     return result;
 }
 
-static void plane_bounce_apply(particle *p, const void *data0, float dt) {
+static void plane_bounce_apply(reordered_particles *p, const void *data0, float dt) {
     (void) dt;
     const float *f_data = (const float *)data0;
-    __m128 z    = _mm_setzero_ps();
-    __m128 nv   = _mm_load_ps(&f_data[0]);
-    __m128 pp   = _mm_load_ps(&p->position[0]);
-    __m128 v    = _mm_load_ps(&p->velocity[0]);
-    __m128 pp1  = _mm_blend_ps(pp, _mm_set_ps1(-1.0f), 0b1000);
-    // multiply vectors:
-    __m128 pd   = _mm_mul_ps(pp1, nv);
-    __m128 vd   = _mm_mul_ps(v  , nv);
-    // horizontal add them:
-    __m128 vd_3 = _mm_movehl_ps(vd, vd); // 1 cycle     k       -> vd_3 = [vd[2]       xx          vd[2]       xx   ]
-    __m128 pd34 = _mm_movehl_ps(pd, pd); // 1 cycle     k       -> pd34 = [pd[2]       pd[3]       pd[2]       pd[3]]
-    __m128 vd_2 = _mm_shuffle_ps(vd, vd, 1);// 1 cycle          -> vd_2 = [vd[1]       vd[0]       vd[0]       vd[0]]
-    __m128 pd_1 = _mm_add_ps(pd,   pd34);// 3 cycles    k       -> pd_1 = [pd[0]+pd[2] pd[1]+pd[3] pd[2]       pd[3]]
-    __m128 vd_1 = _mm_add_ss(vd,   vd_3);// 3 cycles    k       -> vd_1 = [vd[0]+vd[2] vd[1]       vd[2]       xx   ]
-    __m128 pd_2 = _mm_shuffle_ps(pd_1, pd_1, 1);// 1 cycle      -> pd_2 = [pd[1]+pd[3] pd[0]+pd[2] pd[0]+pd[2] pd[0]+pd[2]]
-    __m128 ddst = _mm_add_ps(pd_2, pd_1);// 3 cycles    k       -> vnrm = [ddst        ddst        xx          xx   ]
-    __m128 vnrm = _mm_add_ss(vd_2, vd_1);// 3 cycles    k       -> vnrm = [vnrm        vd[0]       vd[0]       vd[0]]
-
-    /*union {
-        __m128 i;
-        uint32_t f[4];
-    } brnch = {.i = _mm_and_ps(_mm_cmpgt_ss(z, ddst), _mm_cmpgt_ss(z, vnrm))};
-
-    if(brnch.f[0]) {*/
-    float d_dist; float vnormal;
-    _mm_store_ss(&d_dist, ddst); _mm_store_ss(&vnormal, vnrm);
-    if (d_dist < 0.0f && vnormal < 0.0f) {
-        // we are behind plane and velocity is away from the back of the plane
-        __m128 nv_z   = _mm_blend_ps(nv, z, 0b1000);
-        __m128 ddst_a = _mm_movelh_ps(ddst, ddst);    // 1 cycle          -> ddst_a = [ddst ddst ddst ddst]
-        __m128 vnrm_a = _mm_shuffle_ps(vnrm, vnrm, 0);// 1 cycle          -> vnrm_a = [vnrm vnrm vnrm vnrm]
-        __m128 dec    = _mm_load_ps(&f_data[4]);
-        __m128 vnrm_n = _mm_mul_ps(vnrm_a, nv_z);
-        __m128 ddst_n = _mm_mul_ps(ddst_a, nv_z);
-        __m128 v_1    = _mm_sub_ps(v, vnrm_n);
-        __m128 v_2    = _mm_sub_ps(v_1, vnrm_n);
-        __m128 pp_1   = _mm_sub_ps(pp, ddst_n);
-        __m128 v_dec  = _mm_mul_ps(v_2, dec);
-        _mm_store_ps(&p->position[0], pp_1);
-        _mm_store_ps(&p->velocity[0], v_dec);
+    __m128 nv0    = _mm_load_ps1(&f_data[0]);
+    __m128 nv1    = _mm_load_ps1(&f_data[1]);
+    __m128 nv2    = _mm_load_ps1(&f_data[2]);
+    __m128 d      = _mm_load_ps1(&f_data[3]);
+    __m128 dec    = _mm_load_ps1(&f_data[4]);
+    
+    __m128 nv0_2  = _mm_mul_ps(nv0, _mm_set_ps1(2.0f));
+    __m128 nv1_2  = _mm_mul_ps(nv1, _mm_set_ps1(2.0f));
+    __m128 nv2_2  = _mm_mul_ps(nv2, _mm_set_ps1(2.0f));
+    
+    __m128 z      = _mm_setzero_ps();
+    __m128 one    = _mm_set_ps1(1.0f);
+    for (size_t k = 0; k < M; ++k) {
+        __m128 p0     = _mm_load_ps(&p[k].position[0][0]);
+        __m128 p1     = _mm_load_ps(&p[k].position[1][0]);
+        __m128 p2     = _mm_load_ps(&p[k].position[2][0]);
+        __m128 v0     = _mm_load_ps(&p[k].velocity[0][0]);
+        __m128 v1     = _mm_load_ps(&p[k].velocity[1][0]);
+        __m128 v2     = _mm_load_ps(&p[k].velocity[2][0]);
+        
+        __m128 pd0    = _mm_mul_ps(p0, nv0);
+        __m128 pd1    = _mm_mul_ps(p1, nv1);
+        __m128 pd2    = _mm_mul_ps(p2, nv2);
+        __m128 vd0    = _mm_mul_ps(v0, nv0);
+        __m128 vd1    = _mm_mul_ps(v1, nv1);
+        __m128 vd2    = _mm_mul_ps(v2, nv2);
+        
+        __m128 ddst_0 = _mm_add_ps(pd0, pd1);
+        __m128 ddst_1 = _mm_sub_ps(pd2, d);
+        __m128 vnrm_0 = _mm_add_ps(vd0, vd1);
+        __m128 ddst   = _mm_add_ps(ddst_0, ddst_1);
+        __m128 vnrm   = _mm_add_ps(vnrm_0, vd2);
+        
+        __m128 ddst_z = _mm_min_ps(z, ddst);
+        __m128 vnrm_z = _mm_min_ps(z, vnrm);
+        
+        __m128 vmask  = _mm_cmplt_ps(ddst, z);  // mask is true when particle should be modified
+        __m128 dmask  = _mm_cmplt_ps(vnrm, z);  // mask is true when particle should be modified
+        
+        __m128 ddst_zm= _mm_and_ps(ddst_z, dmask);
+        __m128 vnrm_zm= _mm_and_ps(vnrm_z, vmask);
+        
+        __m128 ddst_n0= _mm_mul_ps(ddst_zm, nv0);
+        __m128 ddst_n1= _mm_mul_ps(ddst_zm, nv1);
+        __m128 ddst_n2= _mm_mul_ps(ddst_zm, nv2);
+        
+        __m128 dec_m1 = _mm_blendv_ps(one, dec,    vmask);
+        __m128 dec_m  = _mm_blendv_ps(one, dec_m1, dmask);
+        
+        __m128 vnrm_2n0= _mm_mul_ps(vnrm_zm, nv0_2);
+        __m128 vnrm_2n1= _mm_mul_ps(vnrm_zm, nv1_2);
+        __m128 vnrm_2n2= _mm_mul_ps(vnrm_zm, nv2_2);
+        
+        __m128 v1_0   = _mm_sub_ps(v0, vnrm_2n0);
+        __m128 v1_1   = _mm_sub_ps(v1, vnrm_2n1);
+        __m128 v1_2   = _mm_sub_ps(v2, vnrm_2n2);
+        
+        __m128 p1_0   = _mm_sub_ps(p0, ddst_n0);
+        __m128 p1_1   = _mm_sub_ps(p1, ddst_n1);
+        __m128 p1_2   = _mm_sub_ps(p2, ddst_n2);
+        
+        __m128 v2_0   = _mm_mul_ps(v1_0, dec_m);
+        __m128 v2_1   = _mm_mul_ps(v1_1, dec_m);
+        __m128 v2_2   = _mm_mul_ps(v1_2, dec_m);
+        
+        _mm_store_ps(&p[k].position[0][0], p1_0);
+        _mm_store_ps(&p[k].position[1][0], p1_1);
+        _mm_store_ps(&p[k].position[2][0], p1_2);
+        _mm_store_ps(&p[k].velocity[0][0], v2_0);
+        _mm_store_ps(&p[k].velocity[1][0], v2_1);
+        _mm_store_ps(&p[k].velocity[2][0], v2_2);
     }
 }
 
@@ -515,22 +546,12 @@ static void plane_bounce_perf_c(const particle *p, void *data0, float dt, perfor
     float dist =    data[0]*p->position[0] + data[1]*p->position[1] + data[2]*p->position[2];
     float vnormal = data[0]*p->velocity[0] + data[1]*p->velocity[1] + data[2]*p->velocity[2];
     float d = data[3];
-    out->add += 10;
-    out->mul += 8;
-    out->loads += 12;
-    out->cmp += 1;
-    if(dist<d) {
-        out->cmp += 1;
-        if (vnormal<0.0f) {
-            // branch is taken:
-            out->add += 12;
-            out->mul += 12;
-            out->loads += 4;
-            out->stores += 8;
-        }
-    } else {
-        // branch not taken.
-    }
+    
+    out->add +=    M * 4 * 11;
+    out->mul +=    M * 4 * 15 + 3 * 4;
+    out->cmp +=    M * 4 * 4;
+    out->loads +=  M * 4 * 6 + 5;
+    out->stores += M * 4 * 6;
 }
 
 static particle_effect_c_o3 plane_bounce_effect(float x, float y, float z, float d, float a) {
@@ -538,16 +559,13 @@ static particle_effect_c_o3 plane_bounce_effect(float x, float y, float z, float
     result.particles = 1;
     result.apply.one =  plane_bounce_apply;
     result.perf_c.one = plane_bounce_perf_c;
-    float *data = malloc_align(8*sizeof(float), 16, &result.p_to_free);
+    float *data = malloc_align(5*sizeof(float), 16, &result.p_to_free);
     float r = sqrtf(x*x + y*y + z*z);
     data[0] = x/r;
     data[1] = y/r;
     data[2] = z/r;
     data[3] = d/r;
     data[4] = a;
-    data[5] = a;
-    data[6] = a;
-    data[7] = 1;
     result.userdata = data;
     return result;
 }
