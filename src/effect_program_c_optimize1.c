@@ -159,11 +159,11 @@ void effect_program_c_o1_perf_c(const effect_program *self, const particle_array
     for(size_t i = 0; i < arr->size; ++i) {
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if(effects[j].particles == 1) {
-                if (effects[j].perf_c.one != NULL) 
+                if (effects[j].perf_c.one != NULL)
                     effects[j].perf_c.one(&arr->particles[i], effects[j].userdata, dt, out);
             } else if(effects[j].particles == 2) {
                 for(size_t k = 0; k<i; ++k) {
-                    if (effects[j].perf_c.two != NULL) 
+                    if (effects[j].perf_c.two != NULL)
                         effects[j].perf_c.two(&arr->particles[i], &arr->particles[k], effects[j].userdata, dt, out);
                 }
             }
@@ -412,13 +412,13 @@ static void sphere_bounce_apply(particle *p, const void *data0, float dt) {
     if(d2 > r2 && vnormal < 0.0f) {
         // inside sphere and going further inside sphere:
         float r_reci = sqrtf(r2_reci);
-        
+
         float vnormal2_r2 = 2.0f * vnormal * r2_reci;
-        
+
         float pv0_1 = pv0 - vnormal2_r2*n0;
         float pv1_1 = pv1 - vnormal2_r2*n1;
         float pv2_1 = pv2 - vnormal2_r2*n2;
-        
+
         float d_r_r_reci = d * r_reci - 1.0f;
 
         p->velocity[0] = pv0_1 * dec;

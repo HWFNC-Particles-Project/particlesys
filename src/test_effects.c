@@ -61,7 +61,7 @@ int particle_condition_function(particle p, int test_case, float *data) {
                 // plane bounce.
                 float dist    = data[0]*p.position[0] + data[1]*p.position[1] + data[2]*p.position[2];
                 float vnormal = data[0]*p.velocity[0] + data[1]*p.velocity[1] + data[2]*p.velocity[2];
-                if (test_case == 3) { 
+                if (test_case == 3) {
                     // all particles in front:
                     if(dist<data[3]) {
                         return -1;
@@ -91,7 +91,7 @@ int particle_condition_function(particle p, int test_case, float *data) {
                 normal[2] /= r;
                 float vnormal = normal[0]*p.velocity[0] + normal[1]*p.velocity[1] + normal[2]*p.velocity[2];
                 float d = data[3];
-                if (test_case == 5) { 
+                if (test_case == 5) {
                     // all particles in front:
                     if(r<d) {
                         return -1;
@@ -152,7 +152,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 3:
         case 4: {
                 particle_array_create(arr);
-                //return 1;
+                return 1;
                 if (test_case == 3) {
                     *out_description = "plane bounce, all particles in front";
                 } else if (test_case == 4) {
@@ -193,7 +193,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 8:
         case 9:
             particle_array_create(arr);
-            return 1;
+            //return 1;
             // pairwise collision:
             *out_description = "pairwise collision";
             effect_desc_add_sphere_collision(effects, randf(0,0.1), randf(0,1));
@@ -227,13 +227,13 @@ void test_effects_all(effect_program *test_program) {
         if (tep_ret < 0) break;
         if (tep_ret == 0) {
             printf("TESTCASE %d: %s\n", test_case, description_text);
-            
+
             // compile:
             effect_program_compile(test_program, &effects);
             effect_program_compile(&ref_program, &effects);
-            
+
             performance_count perf;
-            
+
             particle_array arr;
             particle_array_create(&arr);
             // determine performance:
@@ -241,14 +241,14 @@ void test_effects_all(effect_program *test_program) {
             float dt = DT;
             // get performance:
             effect_program_perf_c(test_program, &arr, dt, &perf);
-            
-            double freq = 3.4e9;
+
+            double freq = 1.8e9;
             size_t cost = perf.add * 3 + perf.mul * 5 + perf.div * 11 + perf.cmp * 3 + perf.sqrt * 16 + perf.loads * 4 + perf.stores * 4;
             size_t repeats = 10 * freq / cost;
-            
+
             // verify:
             verify(test_program, &ref_program, &arr);
-            
+
             // run it:
             clock_t start = clock();
             for (size_t r = 0; r < repeats; ++r) {
@@ -258,10 +258,10 @@ void test_effects_all(effect_program *test_program) {
             clock_t end = clock();
             printf("time: %d\n", (int)(end-start));
             double cycles = (end-start) * 0.001 * freq;
-            
+
             performance_count total = perf;
             double part_iteration = (double)particle_array_size(&initial_arr);
-            printf("cycles:      %8.2f\n", cycles / part_iteration / (double)repeats);
+            printf("cycles:      %8.2f\n", (cycles / part_iteration) / (double)repeats);
             //printf("cycles/add:  %8.2f\n", cycles / (double)total.add);
             //printf("cycles/cmp:  %8.2f\n", cycles / (double)total.cmp);
             //printf("cycles/mul:  %8.2f\n", cycles / (double)total.mul);
@@ -273,16 +273,18 @@ void test_effects_all(effect_program *test_program) {
             printf("cmp:         %8.2f\n", (double)total.cmp / part_iteration);
             printf("mul:         %8.2f\n", (double)total.mul / part_iteration);
             printf("div:         %8.2f\n", (double)total.div / part_iteration);
+            printf("rcp:         %8.2f\n", (double)total.rcp / part_iteration);
             printf("sqrt:        %8.2f\n", (double)total.sqrt / part_iteration);
+            printf("rsqrt:       %8.2f\n", (double)total.rsqrt / part_iteration);
             printf("lds:         %8.2f\n", (double)total.loads / part_iteration);
             printf("sts:         %8.2f\n", (double)total.stores / part_iteration);
-            
+
             particle_array_destroy(&arr);
         }
-        
+
         effect_desc_destroy(&effects);
         particle_array_destroy(&initial_arr);
-        
+
         test_case++;
     }
 }

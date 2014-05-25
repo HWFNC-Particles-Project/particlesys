@@ -56,7 +56,9 @@ void test_performance(const effect_program *test_program, const particle_array *
         total.cmp += perf_array[i].cmp * repeats;
         total.mul += perf_array[i].mul * repeats;
         total.div += perf_array[i].div * repeats;
+        total.rcp += perf_array[i].rcp * repeats;
         total.sqrt += perf_array[i].sqrt * repeats;
+        total.rsqrt += perf_array[i].rsqrt * repeats;
         total.loads += perf_array[i].loads * repeats;
         total.stores += perf_array[i].stores * repeats;
     }
@@ -73,10 +75,12 @@ void test_performance(const effect_program *test_program, const particle_array *
     printf("cmp:         %8.2f\n", (double)total.cmp / part_iteration);
     printf("mul:         %8.2f\n", (double)total.mul / part_iteration);
     printf("div:         %8.2f\n", (double)total.div / part_iteration);
+    printf("rcp:         %8.2f\n", (double)total.rcp / part_iteration);
     printf("sqrt:        %8.2f\n", (double)total.sqrt / part_iteration);
+    printf("rsqrt:       %8.2f\n", (double)total.rsqrt / part_iteration);
     printf("lds:         %8.2f\n", (double)total.loads / part_iteration);
     printf("sts:         %8.2f\n", (double)total.stores / part_iteration);
-    printf("flops/cycle: %8.2f\n", (total.add+total.cmp+total.mul+total.div+total.sqrt)/(double)cycles);
+    printf("flops/cycle: %8.2f\n", (total.add+total.cmp+total.mul+total.div+total.sqrt+total.rsqrt+total.rcp)/(double)cycles);
 
     particle_array_destroy(&arr);
     free(perf_array);
@@ -149,7 +153,7 @@ int main(int argc, char *argv[]) {
     effect_desc effects;
     effect_desc_init(&effects);
     // construct effect array:
-    //~ effect_desc_add_linear_accel(&effects,  0, -10, 0);
+    effect_desc_add_linear_accel(&effects,  0, -10, 0);
 
     //~ effect_desc_add_sphere_collision(&effects,  0.015, 0.7);
 
@@ -157,19 +161,19 @@ int main(int argc, char *argv[]) {
     //effect_desc_add_plane_bounce(&effects,  0,  1,  0, 0.8,    0.8);
     //effect_desc_add_plane_bounce(&effects,  0,  -1,  0, -0.85,    0.8);
 
-    //~ effect_desc_add_sphere_bounce(&effects, 0,  0,  0, 0.707, 0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0,  1,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  1,  0,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects, -1,  0,  0, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0,  0,  1, -1,    0.8);
-    //~ effect_desc_add_plane_bounce(&effects,  0,  0, -1, -1,    0.8);
+    effect_desc_add_sphere_bounce(&effects, 0,  0,  0, 0.707, 0.8);
+    effect_desc_add_plane_bounce(&effects,  0,  1,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  0, -1,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  1,  0,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects, -1,  0,  0, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  0,  0,  1, -1,    0.8);
+    effect_desc_add_plane_bounce(&effects,  0,  0, -1, -1,    0.8);
 
-    effect_desc_add_central_force(&effects, 1, 0, 1, -1);
+    //~ effect_desc_add_central_force(&effects, 1, 0, 1, -1);
     //~ effect_desc_add_central_force(&effects,-1, 0, 1, -1);
     //~ effect_desc_add_central_force(&effects, 1, 0,-1, -1);
-    effect_desc_add_central_force(&effects,-1, 0,-1, -1);
+    //~ effect_desc_add_central_force(&effects,-1, 0,-1, -1);
     //~ effect_desc_add_sphere_bounce(&effects,  1,  0,  1, 0.5, 0.9);
     //~ effect_desc_add_sphere_bounce(&effects,  1,  0, -1, 0.5, 0.9);
     //~ effect_desc_add_sphere_bounce(&effects, -1,  0,  1, 0.5, 0.9);
@@ -190,12 +194,16 @@ int main(int argc, char *argv[]) {
     effect_program test_program_0;
     effect_program test_program_1;
     effect_program test_program_2;
-    effect_program test_program_3;
+    effect_program jit_program_0;
+    effect_program jit_program_1;
+    effect_program jit_program_2;
 
     effect_program_create_naive(&test_program_0);
     effect_program_create_c_optimze1(&test_program_1);
     effect_program_create_c_optimze2(&test_program_2);
-    effect_program_create_jit(&test_program_3, JIT_AVX8 | JIT_O3);
+    effect_program_create_jit(&jit_program_0, JIT_AVX1 | JIT_O3);
+    effect_program_create_jit(&jit_program_1, JIT_AVX4 | JIT_O3);
+    effect_program_create_jit(&jit_program_2, JIT_AVX8 | JIT_O3);
 
     //~ test_effects_all(&test_program_2);
     //~ test_effects_all(&test_program_1);
@@ -204,21 +212,24 @@ int main(int argc, char *argv[]) {
     effect_program_compile(&test_program_0, &effects);
     effect_program_compile(&test_program_1, &effects);
     effect_program_compile(&test_program_2, &effects);
-    effect_program_compile(&test_program_3, &effects);
+    effect_program_compile(&jit_program_0, &effects);
+    effect_program_compile(&jit_program_1, &effects);
+    effect_program_compile(&jit_program_2, &effects);
 
     perf_stop_measurement(&perf_program_creation);
 
     // execute
 	perf_start_measurement(&perf_program_execution);
 
-
 	//test_performance(&test_program_1, &initial_arr);
 	test_performance(&test_program_0, &initial_arr);
 	test_performance(&test_program_1, &initial_arr);
 	test_performance(&test_program_2, &initial_arr);
-	test_performance(&test_program_3, &initial_arr);
+	test_performance(&jit_program_0, &initial_arr);
+	test_performance(&jit_program_1, &initial_arr);
+	test_performance(&jit_program_2, &initial_arr);
     //verify(&test_program_1, &ref_program, &initial_arr);
-	verify(&test_program_3, &ref_program, &initial_arr);
+	verify(&jit_program_0, &ref_program, &initial_arr);
 
     perf_stop_measurement(&perf_program_execution);
 

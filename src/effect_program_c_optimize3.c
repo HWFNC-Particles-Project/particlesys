@@ -8,62 +8,63 @@
 #include <smmintrin.h>
 #include "malloc_align.h"
 
+#define M 1
+
+typedef struct reordered_particles_t {
+    float position[3][4];
+    float     mass[1][4];
+    float velocity[3][4];
+    float   charge[1][4];
+} reordered_particles;
+
 /*
  * particle effects consists of a function (apply) and userdata for
  * effect specific data that is passed as second function to apply
  */
-typedef struct particle_effect_c_o2_t {
+typedef struct particle_effect_c_o3_t {
     int particles;
     union {
-        void (*one)(particle *, const void *, float);
-        void (*two)(particle *, particle *, const void *, float);
+        void (*one)(reordered_particles *, const void *, float);
+        void (*two)(reordered_particles *, reordered_particles *, const void *, float);
     } apply;
     union {
-        void (*one)(const particle *, void *, float, performance_count *out);
-        void (*two)(const particle *, const particle *, void *, float, performance_count *out);
+        void (*one)(const reordered_particles *, void *, float, performance_count *out);
+        void (*two)(const reordered_particles *, const reordered_particles *, void *, float, performance_count *out);
     } perf_c;
     void *userdata;
     void *p_to_free;
-} particle_effect_c_o2;
+} particle_effect_c_o3;
 
 
-void effect_program_c_o2_compile(effect_program *self, const effect_desc *desc);
-void effect_program_c_o2_execute(const effect_program *self, particle_array *arr, float dt);
-void effect_program_c_o2_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out);
-void effect_program_c_o2_destroy(effect_program *self);
+void effect_program_c_o3_compile(effect_program *self, const effect_desc *desc);
+void effect_program_c_o3_execute(const effect_program *self, particle_array *arr, float dt);
+void effect_program_c_o3_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out);
+void effect_program_c_o3_destroy(effect_program *self);
 
-static particle_effect_c_o2 linear_accel_effect(float x, float y, float z);
-static particle_effect_c_o2 linear_force_effect(float x, float y, float z);
-static particle_effect_c_o2 gravitational_force_effect(float x, float y, float z, float mu);
-static particle_effect_c_o2 plane_bounce_effect(float x, float y, float z, float d, float a);
-static particle_effect_c_o2 sphere_bounce_effect(float x, float y, float z, float r, float a);
-static particle_effect_c_o2 pairwise_gravitational_force_effect(float mu);
-static particle_effect_c_o2 pairwise_sphere_collision_effect(float radius, float restitution);
-static particle_effect_c_o2 newton_step_effect();
-
-static void linear_accel_apply(particle *p, const void *data0, float dt);
-static void linear_force_apply(particle *p, const void *data0, float dt);
-static void gravitational_force_apply(particle *p, const void *data0, float dt);
-static void plane_bounce_apply(particle *p, const void *data0, float dt);
-static void sphere_bounce_apply(particle *p, const void *data0, float dt);
-static void newton_step_apply(particle *p, const void *data0, float dt);
-
+static particle_effect_c_o3 linear_accel_effect(float x, float y, float z);
+static particle_effect_c_o3 linear_force_effect(float x, float y, float z);
+static particle_effect_c_o3 gravitational_force_effect(float x, float y, float z, float mu);
+static particle_effect_c_o3 plane_bounce_effect(float x, float y, float z, float d, float a);
+static particle_effect_c_o3 sphere_bounce_effect(float x, float y, float z, float r, float a);
+static particle_effect_c_o3 pairwise_gravitational_force_effect(float mu);
+static particle_effect_c_o3 pairwise_sphere_collision_effect(float radius, float restitution);
+static particle_effect_c_o3 newton_step_effect();
 
 
 int effect_program_create_c_optimze2(effect_program *p) {
     memset(p, 0, sizeof(effect_program));
-    p->compile = effect_program_c_o2_compile;
-    p->execute = effect_program_c_o2_execute;
-    p->perf_c  = effect_program_c_o2_perf_c;
-    p->destroy = effect_program_c_o2_destroy;
+    p->compile = effect_program_c_o3_compile;
+    p->execute = effect_program_c_o3_execute;
+    p->perf_c  = effect_program_c_o3_perf_c;
+    p->destroy = effect_program_c_o3_destroy;
     p->usr = NULL;
     return 0;
 }
 
-void effect_program_c_o2_destroy(effect_program *self) {
+void effect_program_c_o3_destroy(effect_program *self) {
     if (self->usr != NULL) {
         // free last compilation result:
-        particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
+        particle_effect_c_o3 *effects = (particle_effect_c_o3 *)self->usr;
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if (effects[j].p_to_free != NULL) {
                 free(effects[j].p_to_free);
@@ -74,14 +75,14 @@ void effect_program_c_o2_destroy(effect_program *self) {
     }
 }
 
-void effect_program_c_o2_compile(effect_program *self, const effect_desc *desc) {
+void effect_program_c_o3_compile(effect_program *self, const effect_desc *desc) {
     if (self->usr != NULL) {
-        effect_program_c_o2_destroy(self);
+        effect_program_c_o3_destroy(self);
     }
     // compile ...
     size_t count = desc->size;
-    self->usr = malloc((count + 1) * sizeof(particle_effect_c_o2));
-    particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
+    self->usr = malloc((count + 1) * sizeof(particle_effect_c_o3));
+    particle_effect_c_o3 *effects = (particle_effect_c_o3 *)self->usr;
     for(size_t i = 0; i < count; ++i) {
         const effect_desc_ele *el = &desc->elements[i];
         switch(el->type) {
@@ -135,68 +136,140 @@ void effect_program_c_o2_compile(effect_program *self, const effect_desc *desc) 
     effects[count].userdata = NULL;
 }
 
-void effect_program_c_o2_execute(const effect_program *self, particle_array *arr, float dt) {
+void effect_program_c_o3_execute(const effect_program *self, particle_array *arr, float dt) {
     if (self->usr == NULL) {
         // fail, no compilation result.
         return;
     }
-    particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
-    for(size_t i = 0; i < arr->size; ++i) {
+    particle_effect_c_o3 *effects = (particle_effect_c_o3 *)self->usr;
+    // create working array:
+    void *warray1_mem = NULL;
+    void *warray2_mem = NULL;
+    reordered_particles *warray1 = malloc_align(M * sizeof(reordered_particles), 16, &warray1_mem);
+    reordered_particles *warray2 = malloc_align(M * sizeof(reordered_particles), 16, &warray2_mem);
+    for(size_t i = 0; i < arr->size; i += M * 4) {
+        // load particles into working array:
+        for(size_t k = 0; k < M; ++k) {
+            size_t base = i + k * 4;
+            for(size_t j = 0; j < 4; ++j) {
+                warray1[k].position[0][j] = arr->particles[base + j].position[0];
+                warray1[k].position[1][j] = arr->particles[base + j].position[1];
+                warray1[k].position[2][j] = arr->particles[base + j].position[2];
+                warray1[k].mass    [0][j] = arr->particles[base + j].mass;
+                warray1[k].velocity[0][j] = arr->particles[base + j].velocity[0];
+                warray1[k].velocity[1][j] = arr->particles[base + j].velocity[1];
+                warray1[k].velocity[2][j] = arr->particles[base + j].velocity[2];
+                warray1[k].charge  [0][j] = arr->particles[base + j].charge;
+            }
+        }
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if(effects[j].particles == 1) {
-                effects[j].apply.one(&arr->particles[i], effects[j].userdata, dt);
+                effects[j].apply.one(warray1, effects[j].userdata, dt);
             } else if(effects[j].particles == 2) {
-                for(size_t k = 0; k<i; ++k) {
+                /*for(size_t k = 0; k<i; ++k) {
                     effects[j].apply.two(&arr->particles[i], &arr->particles[k], effects[j].userdata, dt);
-                }
+                }*/
+            }
+        }
+        // store particles:
+        for(size_t k = 0; k < M; ++k) {
+            size_t base = i + k * 4;
+            for(size_t j = 0; j < 4; ++j) {
+                arr->particles[base + j].position[0] = warray1[k].position[0][j];
+                arr->particles[base + j].position[1] = warray1[k].position[1][j];
+                arr->particles[base + j].position[2] = warray1[k].position[2][j];
+                //arr->particles[base + j].mass        = warray1[k].mass    [0][j]; // cannot change mass
+                arr->particles[base + j].velocity[0] = warray1[k].velocity[0][j];
+                arr->particles[base + j].velocity[0] = warray1[k].velocity[1][j];
+                arr->particles[base + j].velocity[0] = warray1[k].velocity[2][j];
+                //arr->particles[base + j].charge      = warray1[k].charge  [0][j]; // cannot change charge
             }
         }
     }
+    free(warray1_mem);
+    warray1_mem = NULL;
+    free(warray2_mem);
+    warray2_mem = NULL;
 }
 
-void effect_program_c_o2_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out) {
+void effect_program_c_o3_perf_c(const effect_program *self, const particle_array *arr, float dt, performance_count *out) {
     // set all counters to zero:
     memset(out, 0, sizeof(*out));
     if (self->usr == NULL) {
         // fail, no compilation result.
         return;
     }
-    particle_effect_c_o2 *effects = (particle_effect_c_o2 *)self->usr;
+    particle_effect_c_o3 *effects = (particle_effect_c_o3 *)self->usr;
+    // create working array:
+    void *warray1_mem = NULL;
+    void *warray2_mem = NULL;
+    reordered_particles *warray1 = malloc_align(M * sizeof(reordered_particles), 16, &warray1_mem);
+    reordered_particles *warray2 = malloc_align(M * sizeof(reordered_particles), 16, &warray2_mem);
     for(size_t i = 0; i < arr->size; ++i) {
+        // load particles into working array:
+        for(size_t k = 0; k < M; ++k) {
+            size_t base = i + k * 4;
+            for(size_t j = 0; j < 4; ++j) {
+                warray1[k].position[0][j] = arr->particles[base + j].position[0];
+                warray1[k].position[1][j] = arr->particles[base + j].position[1];
+                warray1[k].position[2][j] = arr->particles[base + j].position[2];
+                warray1[k].mass    [0][j] = arr->particles[base + j].mass;
+                warray1[k].velocity[0][j] = arr->particles[base + j].velocity[0];
+                warray1[k].velocity[1][j] = arr->particles[base + j].velocity[1];
+                warray1[k].velocity[2][j] = arr->particles[base + j].velocity[2];
+                warray1[k].charge  [0][j] = arr->particles[base + j].charge;
+            }
+        }
         for(size_t j = 0; effects[j].apply.one != NULL; ++j) {
             if(effects[j].particles == 1) {
                 if (effects[j].perf_c.one != NULL)
-                    effects[j].perf_c.one(&arr->particles[i], effects[j].userdata, dt, out);
+                    effects[j].perf_c.one(warray1, effects[j].userdata, dt, out);
             } else if(effects[j].particles == 2) {
                 for(size_t k = 0; k<i; ++k) {
-                    if (effects[j].perf_c.two != NULL)
-                        effects[j].perf_c.two(&arr->particles[i], &arr->particles[k], effects[j].userdata, dt, out);
+                    /*if (effects[j].perf_c.two != NULL)
+                        effects[j].perf_c.two(&arr->particles[i], &arr->particles[k], effects[j].userdata, dt, out);*/
                 }
             }
         }
     }
+    free(warray1_mem);
+    warray1_mem = NULL;
+    free(warray2_mem);
+    warray2_mem = NULL;
 }
 
-static void linear_accel_apply(particle *p, const void *data0, float dt) {
+static void linear_accel_apply(reordered_particles *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
-    __m128 dtv  = _mm_set_ps1(dt);
-    __m128 a    = _mm_load_ps(&f_data[0]);
-    __m128 v    = _mm_load_ps(&p->velocity[0]);
-    __m128 dt_a = _mm_mul_ps(dtv, a);
-    __m128 v_1  = _mm_add_ps(v, dt_a);
-    _mm_store_ps(&p->velocity[0], v_1);
+    __m128 dtv    = _mm_set_ps1(dt);
+    __m128 a0     = _mm_load_ps1(&f_data[0]);
+    __m128 a1     = _mm_load_ps1(&f_data[1]);
+    __m128 a2     = _mm_load_ps1(&f_data[2]);
+    for (size_t k = 0; k < M; ++k) {
+        __m128 v0     = _mm_load_ps(&p[k].velocity[0][0]);
+        __m128 v1     = _mm_load_ps(&p[k].velocity[1][0]);
+        __m128 v2     = _mm_load_ps(&p[k].velocity[2][0]);
+        __m128 dt_a0  = _mm_mul_ps(dtv, a0);
+        __m128 dt_a1  = _mm_mul_ps(dtv, a1);
+        __m128 dt_a2  = _mm_mul_ps(dtv, a2);
+        __m128 v1_0   = _mm_add_ps(v0 , dt_a0);
+        __m128 v1_1   = _mm_add_ps(v1 , dt_a1);
+        __m128 v1_2   = _mm_add_ps(v2 , dt_a2);
+        _mm_store_ps(&p[k].velocity[0][0], v1_0);
+        _mm_store_ps(&p[k].velocity[1][0], v1_1);
+        _mm_store_ps(&p[k].velocity[2][0], v1_2);
+    }
 }
 
-static void linear_accel_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
+static void linear_accel_perf_c(const reordered_particles *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += 4;
-    out->mul += 4;
-    out->loads += 8;
-    out->stores += 4;
+    out->add += M * 3 * 4;
+    out->mul += M * 3 * 4;
+    out->loads += 3 + M * 3 * 4;
+    out->stores += M * 3 * 4;
 }
 
-static particle_effect_c_o2 linear_accel_effect(float x, float y, float z) {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 linear_accel_effect(float x, float y, float z) {
+    particle_effect_c_o3 result;
     result.particles = 1;
     result.apply.one  = linear_accel_apply;
     result.perf_c.one = linear_accel_perf_c;
@@ -211,27 +284,39 @@ static particle_effect_c_o2 linear_accel_effect(float x, float y, float z) {
 
 static void linear_force_apply(particle *p, const void *data0, float dt) {
     const float *f_data = (const float *)data0;
-    __m128 dtv  = _mm_set_ps1(dt);
-    __m128 m    = _mm_load_ps1(&p->mass);
-    __m128 f    = _mm_load_ps(&f_data[0]);
-    __m128 v    = _mm_load_ps(&p->velocity[0]);
-    __m128 dt_m = _mm_div_ps(dtv, m);
-    __m128 vd   = _mm_mul_ps(dt_m, f);
-    __m128 v_1  = _mm_add_ps(v, vd);
-    _mm_store_ps(&p->velocity[0], v_1);
+    __m128 dtv    = _mm_set_ps1(dt);
+    __m128 f0     = _mm_load_ps1(&f_data[0]);
+    __m128 f1     = _mm_load_ps1(&f_data[1]);
+    __m128 f2     = _mm_load_ps1(&f_data[2]);
+    for (size_t k = 0; k < M; ++k) {
+        __m128 m      = _mm_load_ps(&p[k].mass    [0][0]);
+        __m128 v0     = _mm_load_ps(&p[k].velocity[0][0]);
+        __m128 v1     = _mm_load_ps(&p[k].velocity[1][0]);
+        __m128 v2     = _mm_load_ps(&p[k].velocity[2][0]);
+        __m128 dt_m   = _mm_div_ps(dtv, m);
+        __m128 vd0    = _mm_mul_ps(dt_m, f0);
+        __m128 vd1    = _mm_mul_ps(dt_m, f1);
+        __m128 vd2    = _mm_mul_ps(dt_m, f2);
+        __m128 v1_0   = _mm_add_ps(v0 , vd0);
+        __m128 v1_1   = _mm_add_ps(v1 , vd1);
+        __m128 v1_2   = _mm_add_ps(v2 , vd2);
+        _mm_store_ps(&p[k].velocity[0][0], v1_0);
+        _mm_store_ps(&p[k].velocity[1][0], v1_1);
+        _mm_store_ps(&p[k].velocity[2][0], v1_2);
+    }
 }
 
 static void linear_force_perf_c(const particle *p, void *data0, float dt, performance_count *out) {
     (void) p; (void) data0; (void) dt;
-    out->add += 4;
-    out->mul += 4;
-    out->div += 4;
-    out->loads += 9;
-    out->stores += 4;
+    out->add += M * 3 * 4;
+    out->mul += M * 3 * 4;
+    out->div += M * 1 * 4;
+    out->loads += 3 + M * 4 * 4;
+    out->stores +=    M * 3 * 4;
 }
 
-static particle_effect_c_o2 linear_force_effect(float x, float y, float z) {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 linear_force_effect(float x, float y, float z) {
+    particle_effect_c_o3 result;
     result.particles = 1;
     result.apply.one  = linear_force_apply;
     result.perf_c.one = linear_force_perf_c;
@@ -323,8 +408,8 @@ static void gravitational_force_perf_c(const particle *p, void *data0, float dt,
     out->stores += 4;
 }
 
-static particle_effect_c_o2 gravitational_force_effect(float x, float y, float z, float mu) {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 gravitational_force_effect(float x, float y, float z, float mu) {
+    particle_effect_c_o3 result;
     result.particles = 1;
     result.apply.one  = gravitational_force_apply;
     result.perf_c.one = gravitational_force_perf_c;
@@ -412,8 +497,8 @@ static void plane_bounce_perf_c(const particle *p, void *data0, float dt, perfor
     }
 }
 
-static particle_effect_c_o2 plane_bounce_effect(float x, float y, float z, float d, float a) {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 plane_bounce_effect(float x, float y, float z, float d, float a) {
+    particle_effect_c_o3 result;
     result.particles = 1;
     result.apply.one =  plane_bounce_apply;
     result.perf_c.one = plane_bounce_perf_c;
@@ -548,8 +633,8 @@ static void sphere_bounce_perf_c(const particle *p, void *data0, float dt, perfo
     }
 }
 
-static particle_effect_c_o2 sphere_bounce_effect(float x, float y, float z, float r, float a) {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 sphere_bounce_effect(float x, float y, float z, float r, float a) {
+    particle_effect_c_o3 result;
     result.particles = 1;
     result.apply.one =  sphere_bounce_apply;
     result.perf_c.one = sphere_bounce_perf_c;
@@ -643,8 +728,8 @@ static void pairwise_gravitational_force_perf_c(const particle *p1, const partic
     out->stores += 6;
 }
 
-static particle_effect_c_o2 pairwise_gravitational_force_effect(float mu) {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 pairwise_gravitational_force_effect(float mu) {
+    particle_effect_c_o3 result;
     result.particles = 2;
     result.apply.two  = pairwise_gravitational_force_apply;
     result.perf_c.two = pairwise_gravitational_force_perf_c;
@@ -837,8 +922,8 @@ static void pairwise_sphere_collision_perf_c(const particle *p1, const particle 
     }
 }
 
-static particle_effect_c_o2 pairwise_sphere_collision_effect(float radius, float restitution) {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 pairwise_sphere_collision_effect(float radius, float restitution) {
+    particle_effect_c_o3 result;
     result.particles = 2;
     result.apply.two  = pairwise_sphere_collision_apply;
     result.perf_c.two = pairwise_sphere_collision_perf_c;
@@ -870,8 +955,8 @@ static void newton_step_perf_c(const particle *p, void *data0, float dt, perform
     out->stores += 3;
 }
 
-static particle_effect_c_o2 newton_step_effect() {
-    particle_effect_c_o2 result;
+static particle_effect_c_o3 newton_step_effect() {
+    particle_effect_c_o3 result;
     result.particles = 1;
     result.apply.one  = newton_step_apply;
     result.perf_c.one = newton_step_perf_c;

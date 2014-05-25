@@ -320,7 +320,7 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
     fprintf(stderr, "generate:  %f\n", (t7-t6)*1.0e-6);
 */
 
-    dump_code(program->fun);
+    //~ dump_code(program->fun);
     ssa_block_destroy(&block);
 }
 
