@@ -12,6 +12,8 @@
 
 #define DT 0.01f
 
+#define RULE_DUPLICATION 1
+
 void verify(const effect_program *test_program, const effect_program *ref_program, const particle_array *initial_arr);
 
 static float randf(float min, float max) {
@@ -138,35 +140,38 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
     switch(test_case) {
         case -1:
             particle_array_create(arr);
-            return 1;
+            //return 1;
             *out_description = "overhead";
             add_random_particles(arr, 1024);
             return 0;
         case 0:
             // linear accel:
             particle_array_create(arr);
-            return 1;
+            //return 1;
             *out_description = "linear acceleration";
-            effect_desc_add_linear_accel(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
+            for (int i = 0; i < RULE_DUPLICATION; i++)
+                effect_desc_add_linear_accel(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
             add_random_particles(arr, 1024);
             return 0;
             break;
         case 1:
             // linear force:
             particle_array_create(arr);
-            return 1;
+            //return 1;
             *out_description = "linear force";
-            effect_desc_add_linear_force(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
+            for (int i = 0; i < RULE_DUPLICATION; i++)
+                effect_desc_add_linear_force(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
             add_random_particles(arr, 1024);
             return 0;
             break;
         case 2: {
                 // central force:
                 particle_array_create(arr);
-                return 1;
+                //return 1;
                 *out_description = "central force";
                 float cf_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1)};
-                effect_desc_add_central_force(effects,  cf_data[0], cf_data[1], cf_data[2], randf(0,1));
+                for (int i = 0; i < RULE_DUPLICATION; i++)
+                    effect_desc_add_central_force(effects,  cf_data[0], cf_data[1], cf_data[2], randf(0,1));
                 add_random_particles_cond(arr, 1024, particle_condition_function, test_case, cf_data);
                 return 0;
             }
@@ -186,7 +191,8 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
                 }
                 float plane_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1), randf(-1,1)};
                 // plane bounce, all particles in front:
-                effect_desc_add_plane_bounce(effects, plane_data[0], plane_data[1], plane_data[2], plane_data[3], randf(0,1));
+                for (int i = 0; i < RULE_DUPLICATION; i++)
+                    effect_desc_add_plane_bounce(effects, plane_data[0], plane_data[1], plane_data[2], plane_data[3], randf(0,1));
                 add_random_particles_cond(arr, 1024, particle_condition_function, test_case, plane_data);
                 return 0;
             }
@@ -205,7 +211,8 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
                 }
                 float sphere_data[4] = {randf(-1,1), randf(-1,1), randf(-1,1), randf(0,1)};
                 // sphere bounce, all particles in front:
-                effect_desc_add_sphere_bounce(effects, sphere_data[0], sphere_data[1], sphere_data[2], sphere_data[3], randf(0,1));
+                for (int i = 0; i < RULE_DUPLICATION; i++)
+                    effect_desc_add_sphere_bounce(effects, sphere_data[0], sphere_data[1], sphere_data[2], sphere_data[3], randf(0,1));
                 add_random_particles_cond(arr, 1024, particle_condition_function, test_case, sphere_data);
                 return 0;
             }
@@ -215,7 +222,8 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             return 1;
             // pairwise gravity:
             *out_description = "pairwise gravity";
-            effect_desc_add_gravity_force(effects,  randf(0,1));
+            for (int i = 0; i < RULE_DUPLICATION; i++)
+                effect_desc_add_gravity_force(effects,  randf(0,1));
             add_random_particles(arr, 200);
             return 0;
             break;
@@ -225,21 +233,93 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
             return 1;
             // pairwise collision:
             *out_description = "pairwise collision";
-            effect_desc_add_sphere_collision(effects, randf(0,0.1), randf(0,1));
+            for (int i = 0; i < RULE_DUPLICATION; i++)
+                effect_desc_add_sphere_collision(effects, randf(0,0.1), randf(0,1));
             add_random_particles(arr, 200);
             return 0;
             break;
         case 12:
             particle_array_create(arr);
-            return 1;
-            // linear force:
+            //return 1;
+            // newton step:
             *out_description = "newton step";
-            effect_desc_add_newton_step(effects);
+            for (int i = 0; i < RULE_DUPLICATION; i++)
+                effect_desc_add_newton_step(effects);
             add_random_particles(arr, 1024);
+            return 0;
+            break;
+        case 13: {
+                particle_array_create(arr);
+                //return 1;
+                // linear force:
+                *out_description = "example program";
+                
+                effect_desc_add_linear_accel(effects,  0, -10, 0);
+                
+                effect_desc_add_sphere_bounce(effects, 0,  0,  0, 0.707, 0.8);
+                effect_desc_add_plane_bounce(effects,  0,  1,  0, -1,    0.8);
+                effect_desc_add_plane_bounce(effects,  0, -1,  0, -1,    0.8);
+                effect_desc_add_plane_bounce(effects,  0, -1,  0, -1,    0.8);
+                effect_desc_add_plane_bounce(effects,  1,  0,  0, -1,    0.8);
+                effect_desc_add_plane_bounce(effects, -1,  0,  0, -1,    0.8);
+                effect_desc_add_plane_bounce(effects,  0,  0,  1, -1,    0.8);
+                effect_desc_add_plane_bounce(effects,  0,  0, -1, -1,    0.8);
+                
+                effect_desc_add_newton_step (effects);
+                
+                unsigned int N = 32;
+                for(size_t i = 0;i<N;++i) {
+                    for(size_t j = 0;j<N;++j) {
+                        particle p;
+                        p.position[0] = (i+0.5f)/(float)N-0.5f; p.position[1] = 1; p.position[2] = (j+0.5f)/(float)N-0.5f;
+                        p.velocity[0] = 0; p.velocity[1] = 0; p.velocity[2] = 0;
+                        p.mass = 1;
+                        p.charge = 1;
+                        particle_array_add(arr, p);
+                    }
+                }
+            }
             return 0;
             break;
     }
     return -1;
+}
+
+void test_performance_effect(effect_program *test_program, const effect_desc *effects, const particle_array *initial_arr, 
+                      performance_count *perf, double *time, double *cycles) {
+    // compile:
+    effect_program_compile(test_program, effects);
+    
+    performance_count perf_local;
+    if (perf == NULL) {
+        perf = &perf_local;
+    }
+    
+    particle_array arr;
+    particle_array_create(&arr);
+    // determine performance:
+    particle_array_copy(&arr, initial_arr);
+    float dt = DT;
+    // get performance:
+    effect_program_perf_c(test_program, &arr, dt, perf);
+
+    //double freq = 1.8e9;
+    double freq = 3.4e9;
+    size_t cost = 75 * particle_array_size(initial_arr) + 
+                  perf->add * 3 + perf->mul * 5 + perf->div * 11 + perf->rcp * 7 + perf->cmp * 3 + perf->sqrt * 16 + perf->loads * 4 + perf->stores * 4;
+    size_t repeats = 10 * freq / cost;
+
+    // run it:
+    clock_t start = clock();
+    for (size_t r = 0; r < repeats; ++r) {
+        particle_array_copy(&arr, initial_arr);
+        effect_program_execute(test_program, &arr, dt);
+    }
+    clock_t end = clock();
+    if (time)   *time   = (double)(end-start) * 0.001 / (double)repeats;
+    if (cycles) *cycles = (double)(end-start) * 0.001 * freq / (double)repeats;
+    
+    particle_array_destroy(&arr);
 }
 
 void test_effects_all(effect_program *test_program) {
@@ -260,39 +340,22 @@ void test_effects_all(effect_program *test_program) {
             // compile:
             effect_program_compile(test_program, &effects);
             effect_program_compile(&ref_program, &effects);
+            // verify:
+            verify(test_program, &ref_program, &initial_arr);
 
             performance_count perf;
-
-            particle_array arr;
-            particle_array_create(&arr);
-            // determine performance:
-            particle_array_copy(&arr, &initial_arr);
-            float dt = DT;
-            // get performance:
-            effect_program_perf_c(test_program, &arr, dt, &perf);
-
-            //double freq = 1.8e9;
-            double freq = 3.4e9;
-            size_t cost = 75 * particle_array_size(&initial_arr) + 
-                          perf.add * 3 + perf.mul * 5 + perf.div * 11 + perf.rcp * 7 + perf.cmp * 3 + perf.sqrt * 16 + perf.loads * 4 + perf.stores * 4;
-            size_t repeats = 10 * freq / cost;
-
-            // verify:
-            verify(test_program, &ref_program, &arr);
-
-            // run it:
-            clock_t start = clock();
-            for (size_t r = 0; r < repeats; ++r) {
-                particle_array_copy(&arr, &initial_arr);
-                effect_program_execute(test_program, &arr, dt);
-            }
-            clock_t end = clock();
-            printf("time: %d\n", (int)(end-start));
-            double cycles = (end-start) * 0.001 * freq;
-
+            double time;
+            double cycles;
+            double cycles_ref;
+            
+            test_performance_effect(test_program, &effects, &initial_arr, &perf, &time, &cycles);
+            test_performance_effect(&ref_program, &effects, &initial_arr, NULL, NULL, &cycles_ref);
+            
             performance_count total = perf;
             double part_iteration = (double)particle_array_size(&initial_arr);
-            printf("cycles:      %8.2f\n", (cycles / part_iteration) / (double)repeats);
+            printf("time:        %8.6f\n", time);
+            printf("speedup:     %8.1f\n", cycles_ref / cycles);
+            printf("cycles:      %8.2f\n", (cycles / part_iteration));
             //printf("cycles/add:  %8.2f\n", cycles / (double)total.add);
             //printf("cycles/cmp:  %8.2f\n", cycles / (double)total.cmp);
             //printf("cycles/mul:  %8.2f\n", cycles / (double)total.mul);
@@ -309,8 +372,6 @@ void test_effects_all(effect_program *test_program) {
             printf("rsqrt:       %8.2f\n", (double)total.rsqrt / part_iteration);
             printf("lds:         %8.2f\n", (double)total.loads / part_iteration);
             printf("sts:         %8.2f\n", (double)total.stores / part_iteration);
-
-            particle_array_destroy(&arr);
         }
 
         effect_desc_destroy(&effects);
