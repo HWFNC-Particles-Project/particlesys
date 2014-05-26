@@ -102,11 +102,12 @@
 				<Option compiler="gnu_gcc_compiler_x64" />
 				<Compiler>
 					<Add option="-march=corei7" />
+					<Add option="-fomit-frame-pointer" />
 					<Add option="-fexpensive-optimizations" />
 					<Add option="-O3" />
-					<Add option="-g" />
 					<Add option="-mno-abm" />
 					<Add option="-fno-tree-vectorize" />
+					<Add option="-funroll-loops" />
 					<Add option="-DNO_VIS" />
 				</Compiler>
 			</Target>
