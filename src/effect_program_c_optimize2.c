@@ -316,7 +316,6 @@ static void gravitational_force_perf_c(const particle *p, void *data0, float dt,
     (void) p; (void) data0; (void) dt;
     out->add += 18;
     out->mul += 32;
-    out->div += 4;
     out->rcp +=4;
     out->sqrt += 4;
     out->loads += 16;

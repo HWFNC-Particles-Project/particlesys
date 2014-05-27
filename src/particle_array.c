@@ -78,10 +78,10 @@ int particle_array_compare(particle_array *arr1, particle_array *arr2, float eps
             // with tolerance eps:
             if (d_rel > rel_eps && d > eps) {
                 fprintf(stderr, "[particle_array_compare] error: particle %d is different (component %d, delta %g, rel %g)\n", (int)i, (int)j, (double)d, (double)d_rel);
-                //return 1;
+                return 1;
             } else if (d_rel < -rel_eps && d < -eps) {
                 fprintf(stderr, "[particle_array_compare] error: particle %d is different (component %d, delta %g, rel %g)\n", (int)i, (int)j, (double)d, (double)d_rel);
-                //return -1;
+                return -1;
             }
         }
     }

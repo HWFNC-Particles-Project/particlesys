@@ -83,7 +83,7 @@ void test_performance(const effect_program *test_program, const particle_array *
 }
 
 void print_array(particle_array *arr) {
-    for(int i = 0;i<particle_array_size(arr);++i) {
+    for(size_t i = 0;i<particle_array_size(arr);++i) {
         particle p = particle_array_get(arr, i);
         printf("%f %f %f %f %f %f %f %f\n", p.array[0], p.array[1], p.array[2], p.array[3], p.array[4], p.array[5], p.array[6], p.array[7]);
     }
@@ -190,6 +190,7 @@ int main(int argc, char *argv[]) {
     effect_program test_program_0;
     effect_program test_program_1;
     effect_program test_program_2;
+    effect_program test_program_3;
     effect_program jit_program_0;
     effect_program jit_program_1;
     effect_program jit_program_2;
@@ -203,13 +204,14 @@ int main(int argc, char *argv[]) {
     effect_program_create_jit(&jit_program_2, JIT_AVX4 | JIT_O2);
     effect_program_create_jit(&jit_program_3, JIT_AVX4 | JIT_O3);
 
-    //~ test_effects_all(&test_program_2);
+    //~ test_effects_all(&test_program_3);
     //~ test_effects_all(&test_program_1);
 
     // compile
     effect_program_compile(&test_program_0, &effects);
     effect_program_compile(&test_program_1, &effects);
     effect_program_compile(&test_program_2, &effects);
+    effect_program_compile(&test_program_3, &effects);
     effect_program_compile(&jit_program_0, &effects);
     effect_program_compile(&jit_program_1, &effects);
     effect_program_compile(&jit_program_2, &effects);
