@@ -466,7 +466,6 @@ static particle_effect_c_o3 gravitational_force_effect(float x, float y, float z
     data[2] = z;
     data[3] = mu;
     result.userdata = data;
-    result.p_to_free = data;
     return result;
 }
 
