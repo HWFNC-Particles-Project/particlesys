@@ -74,7 +74,7 @@ to a new function using the System V calling convention
 (http://www.x86-64.org/documentation/abi.pdf).
 
 All three generators use strictly VEX encoded instructions and therefore
-require and AVX capable CPU. The reasoning behind this choice is the
+require an AVX capable CPU. The reasoning behind this choice is the
 ability to use the non-destructive 3-operand encoding which corresponds
 more directly to the SSA IR. Using the legacy SSE encoding would require
 insertion of additional MOV instructions otherwise.
@@ -88,6 +88,14 @@ of the currently held operands will be used last.
 The actual encoding of the x86-64 instructions is provided by PLASM
 (https://github.com/progschj/plasm).
 
+Compiler Performance
+--------------------
+
+All compiler steps should have O(N) complexity in most cases with
+scheduling being the most expensive one (50-70% of overall time).
+For the largest tested example (17 rules ~800 SSA instructions)
+compilation took ~0.5ms.
+
 Miscellaneous
 -------------
 
@@ -98,3 +106,6 @@ all the running time to some instruction near the indirect call.
 During some tests INSERTPS instructions were used instead of the VEX encoded
 VINSERTPS. Mixing these encodings resulted in a drastic performance drop
 of about a factor 5.
+
+Compile times even for fairly large rules sets 10+ compile in less than 1 ms
+with full optimizations.

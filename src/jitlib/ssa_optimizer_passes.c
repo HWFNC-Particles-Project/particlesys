@@ -232,7 +232,7 @@ static void ssa_add_latencies(ssa_block *block, int *latencies, int i, int laten
     }
 }
 
-void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
+int ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
     ssa_apply_remap(block);
 
     uint64_t *newbuf = malloc(block->capacity*sizeof(uint64_t));
@@ -275,7 +275,11 @@ void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
     int graph[total_uses];
     int sum = 0;
     int independents = 0;
+    int max_latency = 0;
     for(size_t i = 0;i<block->size;++i) {
+        if(latencies[i]>max_latency) {
+            max_latency = latencies[i];
+        }
         sum += uses[i];
         start[i] = sum;
         dependencies[i] = 0;
@@ -345,7 +349,7 @@ void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
                 score += 1+latencies[j];
                 registerchange = 1;
             }
-            if(registers >= 15) {
+            if(registers >= 16) {
                 score += 1000*(1-registerchange);
             }
             if(best<score) {
@@ -387,4 +391,5 @@ void ssa_schedule(ssa_block *block, const ssa_scheduling_info *info) {
     free(block->buffer);
     block->buffer = newbuf;
     ssa_apply_remap_raw(block);
+    return max_latency;
 }
