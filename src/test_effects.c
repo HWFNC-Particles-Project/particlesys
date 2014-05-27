@@ -12,7 +12,7 @@
 
 #define DT 0.01f
 
-#define RULE_DUPLICATION 8
+#define RULE_DUPLICATION 16
 
 void verify(const effect_program *test_program, const effect_program *ref_program, const particle_array *initial_arr);
 
@@ -157,7 +157,7 @@ int test_effects_prepare(int test_case, effect_desc *effects, particle_array *ar
         case 1:
             // linear force:
             particle_array_create(arr);
-            //return 1;
+            return 1;
             *out_description = "linear force";
             for (int i = 0; i < RULE_DUPLICATION; i++)
                 effect_desc_add_linear_force(effects,  randf(-1,1), randf(-1,1), randf(-1,1));
@@ -308,6 +308,8 @@ void test_performance_effect(effect_program *test_program, const effect_desc *ef
     size_t cost = 75 * particle_array_size(initial_arr) + 
                   perf->add * 3 + perf->mul * 5 + perf->div * 11 + perf->rcp * 7 + perf->cmp * 3 + perf->sqrt * 16 + perf->loads * 4 + perf->stores * 4;
     size_t repeats = 10 * freq / cost;
+    
+    printf("doing %d repeats\n", (int)repeats);
 
     // run it:
     clock_t start = clock();
