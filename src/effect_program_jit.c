@@ -42,7 +42,6 @@ static struct {
         "diffx = [0]-x\n"
         "diffy = [1]-y\n"
         "diffz = [2]-z\n"
-
         "r = 1.0/sqrt(diffx*diffx + diffy*diffy + diffz*diffz)\n"
 
         //~ "r0 = diffx*diffx + diffy*diffy + diffz*diffz\n"
@@ -248,7 +247,7 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
     ssa_block block;
     ssa_block_load(&block, NULL, 0);
 
-    program->const_input = realloc(program->const_input, sizeof(float)*128);
+    program->const_input = realloc(program->const_input, sizeof(float)*256);
 
     int paramcount = 1;
     for(size_t i = 0;i<desc->size;++i) {
@@ -259,9 +258,21 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
         int effect_inputs = program->effects[el->type].inputs;
 
         for(int j = 1;j<effect_params;++j) {
-            program->const_input[paramcount] = el->float_usr[j-1];
-            input_remap[8*effect_inputs + j] = 8*effect_inputs + paramcount;
-            paramcount++;
+            float value = el->float_usr[j-1];
+            size_t k = 1;
+            // check if float value is already a parameter
+            for(;k<paramcount;++k) {
+                if(program->const_input[k] == value) {
+                    break;
+                }
+            }
+
+            program->const_input[k] = value;
+            input_remap[8*effect_inputs + j] = 8*effect_inputs + k;
+
+            if(paramcount == k) {
+                paramcount++;
+            }
         }
         ssa_block_append(&block, &program->effects[el->type].block, input_remap);
     }
@@ -292,12 +303,13 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
     uint64_t t5 = nanotime();
 
     if(program->level >= JIT_O3) {
+        int latency_estimate = 0;
         switch(program->level&0x0F) {
-            case JIT_AVX8: ssa_schedule(&block, ivybridge8); break;
-            case JIT_AVX4: ssa_schedule(&block, ivybridge4); break;
-            default:       ssa_schedule(&block, ivybridge1); break;
+            case JIT_AVX8: latency_estimate = ssa_schedule(&block, ivybridge8); break;
+            case JIT_AVX4: latency_estimate = ssa_schedule(&block, ivybridge4); break;
+            default:       latency_estimate = ssa_schedule(&block, ivybridge1); break;
         }
-
+        printf("estimated_latency: %d\n", latency_estimate);
     }
     uint64_t t6 = nanotime();
 
@@ -310,6 +322,8 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
         case JIT_AVX1: program->fun = gencode_avx_ss(&block, 8); break;
     }
     uint64_t t7 = nanotime();
+
+
 /*
     fprintf(stderr, "fuse:      %f\n", (t1-t0)*1.0e-6);
     fprintf(stderr, "fold:      %f\n", (t2-t1)*1.0e-6);
@@ -318,6 +332,7 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
     fprintf(stderr, "resolve:   %f\n", (t5-t4)*1.0e-6);
     fprintf(stderr, "schedule:  %f\n", (t6-t5)*1.0e-6);
     fprintf(stderr, "generate:  %f\n", (t7-t6)*1.0e-6);
+    fprintf(stderr, "total:     %f\n\n", (t7-t0)*1.0e-6);
 */
 
     //~ dump_code(program->fun);
