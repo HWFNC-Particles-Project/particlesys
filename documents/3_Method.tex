@@ -1,0 +1,25 @@
+\section{Method}\label{sec:method}
+
+Starting from a simple, straight-forward baseline implementation we have introduced two main paths of optimization which we discuss in detail in this section. On one hand we applied conventional optimizations, e.g. vectorization, to the baseline implementation. On the other hand we have the JIT compiler itself, which implements all the necessary steps to produce executable code.
+
+\mypar{Baseline Implementation}
+Our baseline implementation consists of all the possible rules, each accessible through a function pointer, and an array of particles. In order to run the simulation one can now simply collect a list of desired rules and pass them to the main simulation function. This function then simply iterates over all particles and applies every rule to each particle.
+
+\mypar{Conventional Optimizations}
+The dynamic nature of the rule composition limits a conventional compiler or the programmer to optimizing the code on a per rule basis. With the baseline code already written in SSA form (single static assignment) we have then implemented two variants of vectorization. The first one implementing 3D-vector arithmetic in SSE code and the second one processing multiple particles in parallel. 
+
+Implementing 3D-vector arithmetic may seem attractive but poses two problems. SSE registers can hold four floats (single precision floating point number) in 128 bits which means for 3D-vectors we already waste 1/4th of the register space and going to the newer AVX instruction at 256 bit wide registers means either wasting 5/8th of the available space or rewriting all the code to process two 3D-vectors in parallel. Furthermore there are no dedicated instructions to calculate the euclidean length of a vector and therefore require significant overhead for data shuffling. The one advantage of this approach lies in the treatment of conditional code, e.g. in collision detections. As only one particle is processed at a time it is possible to skip unneeded computations. 
+
+Processing multiple particles by packing their respective x, y, and z coordinates into different register reverses these drawbacks and advantages. This treatment trivially allows to go from SSE to AVX instructions by simply loading twice as many particles into the registers. In contrast it is no longer possible to use conditional statements to skip portions of the code. A conditional check may be true for some particles and false for others. Instead we use the conditional check to produce a mask indicating for which particles the check holds and for which it doesn't. We then run the conditional code for all particles and mask the application of the results according to this indication mask. 
+
+\mypar{JIT Compiler}
+
+
+For this class, explain all the optimizations you performed. This mean, you first very briefly
+explain the baseline implementation, then go through locality and other optimizations, and finally SSE (every project will be slightly different of course). Show or mention relevant analysis or assumptions. A few examples: 1) Profiling may lead you to optimize one part first; 2) bandwidth plus data transfer analysis may show that it is memory bound; 3) it may be too hard to implement the algorithm in full generality: make assumptions and state them (e.g., we assume $n$ is divisible by 4; or, we consider only one type of input image); 4) explain how certain data accesses have poor locality. Generally, any type of analysis adds value to your work.
+
+As important as the final results is to show that you took a structured, organized approach to the optimization and that you explain why you did what you did.
+
+Mention and cite any external resources including library or other code.
+
+Good visuals or even brief code snippets to illustrate what you did are good. Pasting large amounts of code to fill the space is not good.
