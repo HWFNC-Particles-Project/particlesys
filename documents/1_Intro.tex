@@ -1,26 +1,13 @@
 \section{Introduction}\label{sec:intro}
 
-Do not start the introduction with the abstract or a slightly modified
-version. It follows a possible structure of the introduction. 
-Note that the structure can be modified, but the
-content should be the same. Introduction and abstract should fill at most the first page, better less.
+Traditionally environmental animations for games and movies were done procedurally or by hand. With the ongoing desire to produce realistic and detailed environments these animations are becoming to numerous and complex to be done by hand or procedurally, not to mention too costly as well. The steady increase in available compute power in the last few years made it possible to replace these time and cost intensive task will small simulations that produce physically convincing results while still providing a degree of influence to the creator. 
 
-\mypar{Motivation} The first task is to motivate what you do.  You can
-start general and zoom in one the specific problem you consider.  In
-the process you should have explained to the reader: what you are doing,
-why you are doing, why it is important (order is usually reversed).
+\mypar{Motivation} 
+In the light of these requirements and circumstances we decided to look at particle simulations. Such particle simulations are especially interesting as they allow to model a wide range of environments depending on the set of rules governing a given scenario. As the number and composition of such rules is arbitrarily large and can dynamically change over the course of the simulation it is not possible to produce optimized code for such a simulation. We have therefore decided to explore the possibility of creating a just-in-time compiler (JIT) specialized for such particle simulations.
 
-For example, if my result is the fastest DFT implementation ever, one
-could roughly go as follows. First explain why the DFT is important
-(used everywhere with a few examples) and why performance matters (large datasets,
-realtime). Then explain that fast implementations are very hard and
-expensive to get (memory hierarchy, vector, parallel). 
+Limiting the scope of the compiler input to a well defined and small problem allows our JIT compiler to incorporate a lot of domain specific knowledge and optimizations directly into its inner workings. For example our JIT compiler knows the data layout for the particles and does not have to support any number of possible containers or data formats. 
 
-Now you state what you do in this paper. In our example: 
-presenting a DFT implementation that is
-faster for some sizes than all the other ones.
+\mypar{Related work} 
+JIT compilers are located somewhere between traditional ahead-of-time compilers such as gcc or icc and interpretors for scripting languages such as javascript. And as such often include techniques from both end of this spectrum. One of the best known and best performing JIT compiler is luajit $->$citation needed: luajit$<-$, a JIT compiler for the scripting language lua.
 
-\mypar{Related work} Next, you have to give a brief overview of
-related work. For a paper like this, anywhere between 2 and 8
-references. Briefly explain what they do. In the end contrast to what
-you do to make now precisely clear what your contribution is.
+As for particle systems they have been studied in great details and been in use for a long time $>-$citation needed$<-$ and there exist optimizations and implementations for any number of simulation settings.
