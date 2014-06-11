@@ -1,30 +1,54 @@
 \section{Background: Whatever the Background is}\label{sec:background}
 
-Give a short, self-contained summary of necessary
-background information. For example, assume you present an
-implementation of FFT algorithms. You could organize into DFT
-definition, FFTs considered, and cost analysis. The goal of the
-background section is to make the paper self-contained for an audience
-as large as possible. As in every section
-you start with a very brief overview of the section. Here it could be as follows: In this section 
-we formally define the discrete Fourier transform, introduce the algorithms we use
-and perform a cost analysis.
+In this section we provide a detailed description of the particle system we use, the domain specific language (DSL) the JIT compiler accepts as input, how the JIT compiler is structured, and conduct a cost and complexity analysis.
 
-\mypar{Discrete Fourier Transform}
-Precisely define the transform so I understand it even if I have never
-seen it before.
+\mypar{Particle System}
+The particle simulation we concentrate on consist of two main components, the particles themselves and the set of rules governing the interaction and progress of the simulation. The particles themselves are provided in the following way:
+\begin{lstlisting}
+struct particle_t {
+    float position[3];
+    float mass;
+    float velocity[3];
+    float charge;
+} particle;
+\end{lstlisting} 
 
-\mypar{Fast Fourier Transforms}
-Explain the algorithm you use.
+This allows for 16 bytes aligned access to both the position and velocity vectors, as well as creating rules for diverse application, e.g. for physical or chemical simulations.
+
+As for the rules, they are provided as functions that take a particle and an array of rule specific values as input and then compute and apply an arbitrary update to the given particle. This setup allows for a great flexibility on what the rules can do, and even the time step for the simulation itself is such a rule:
+
+\begin{lstlisting}
+newton_step_apply(particle *p, void *data0) {
+    float dt =  data0[0];
+    p->position[0] += dt*p->velocity[0];
+    p->position[1] += dt*p->velocity[1];
+    p->position[2] += dt*p->velocity[2];
+}
+\end{lstlisting}
+
+In the end the complete simulation follows three very simple steps:
+\begin{itemize}
+\item get particles
+\item get rules
+\item iterate over all particles and apply every rule to them
+\end{itemize}
+
+If now the environment changes between iterations one simple has to update the list of rules to adapt the simulation to these new circumstances and can go right back to the simulation.
+
+\mypar{DSL}
+In order to keep the complexity and amount of work necessary for processing the code for the simulation rules we decided to introduce a small domain specific language (DSL). This DSL provides the following features: array access, floats as data type, algebraic operators, and boolean operators, the syntax closely matching that of the C language. This limited feature set allows for an efficient parsing and implementation in our JIT compiler. 
+
+\mypar{JIT Compiler}
+The goal of our JIT compiler is to fuse multiple rules into one executable function, therefore exploiting possible optimizations across multiple rules which static optimized code cannot do in ahead of time compilations. 
+
+MORE HERE
+-> standard parser/lexing
+-> processing/optimizations (dead code/ deduplication)
+-> Outputting code
+-> setting exec bit
 
 \mypar{Cost Analysis}
-First define you cost measure (what you count) and then compute the
-cost. Ideally precisely, at least asymptotically. In the latter case you will need to instrument your code to count
-the operations so you can create a performance plot.
+While it is possible to determine the exact op-count for any given rule there is no global cost measure in the number of particles as the final op-count depends on the number and nature of the involved rules and is subject to changes as the rules change throughout the simulation. The op-count relative to the input size, in our case number of particles, is always constant, meaning $O(1)$, the neglected constant factor pushes our computation far into the compute bound region of theoretical performance for all except the smallest simulations including only very few rules. Furthermore our simulation exhibits perfect spatial locality as it passes over the particles linearly.
+Given that our JIT compiler changes the number of stores, loads, and operations required for applying the rules, it is not possible to simply compare the flops/cycle between our jited code and optimized traditional code. The reason simply being that code with lower operational intensity but requiring fewer operations may still be faster than code requiring more operations and achieving higher operational intensity. 
 
-Also state what is
-known about the complexity (asymptotic usually) 
-about your problem (including citations).
-
-Don't talk about "the complexity of the algorithm.'' It's incorrect,
-remember (Lecture 2)?
+We have therefore decided to look at the runtime, more precisely at the cycles per particle. This allows for a precise comparison how our jited code performs in comparison to the conventional code in an absolute way. 
