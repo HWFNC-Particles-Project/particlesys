@@ -1,26 +1,54 @@
 \section{Experimental Results}\label{sec:exp}
 
-Here you evaluate your work using experiments. You start again with a
-very short summary of the section. The typical structure follows.
+In this section be briefly describe our experimental setup, then provide some performance data on the JIT compiler itself, i.e. how fast is it, and finally we compare the code produced from the JIT compiler with the conventionally optimized and compiled code. 
 
-\mypar{Experimental setup} Specify the platform (processor, frequency, cache sizes)
+\mypar{Experimental setup} 
+
+Specify the platform (processor, frequency, cache sizes)
 as well as the compiler, version, and flags used. I strongly recommend that you play with optimization flags and consider also icc for additional potential speedup.
 
-Then explain what input you used and what range of sizes. The idea is to give enough information so the experiments are reproducible by somebody else on his or her code.
 
-\mypar{Results}
-Next divide the experiments into classes, one paragraph for each. In the simplest case you have one plot that has the size on the x-axis and the performance on the y-axis. The plot will contain several lines, one for each relevant code version. Discuss the plot and extract the overall performance gain from baseline to best code. Also state the percentage of peak performance for the best code. Note that the peak may change depending on the situation. For example, if you only do additions it would be 12 Gflop/s
-on one core with 3 Ghz and SSE and single precision floating point.
+\mypar{JIT Compiler}
 
-Do not put two performance lines into the same plot if the operations count changed significantly (that's apples and oranges). In that case first perform the optimizations that reduce op count and report the runtime gain in a plot. Then continue to optimize the best version and show performance plots.
+\begin{figure}\centering
+  \includegraphics[scale=0.6]{single_dual_rules.pdf}
+  \caption{Performance of the JIT compiler itself
+  \label{perf_jit}}
+\end{figure}
 
-{\bf You should}
+Let us now take a look at the JIT compiler itself. While its performance is not the critical aspect it should run fast enough to be worth the time spent inside of it.
+If we take a look at where the jit compiler spends its time [\ref{perf_jit}] we immediately see that all except two stages run in the range of a few microseconds and only the scheduling and code generation take significantly more time. The code generation runs in approximately constant time, around 200 to 300 microseconds, where most of the time is used for two system-calls. These two calls, \texttt{mmap} and \texttt{mprotect}, cause page faults and context switches within the operating system and therefore use a lot of time. The actual writing of the code is only a minor part of the generation stage. Turning our attention to the scheduling stage we immediately see that the time used for the scheduling steps is strongly dependant on the number of rules, and by extension the number of instructions within them, that are composed together. For only a few rules the scheduling is still eclipsed by the code generation, for any at least mildly complex scenario though the scheduling does take a longer time to complete its work. Still the whole JIT compiler runs in the sub-millisecond range and is therefore fast enough real time usage.
+
+\mypar{Code Perfomance}
+
+When looking at the performance of the code itself we distinguish two situations. The first one compasses scenarios were there is only one or two rules and allows us to see how well our JIT compiler performs in direct comparison with AOT compilers. The second scenario takes a closer look at simulations with at least four and up to more than twenty rules, exhibiting the potential for optimizations across multiple rules. Before we go to these results here the list of what the different configurations in the plots represent
 \begin{itemize}
-\item Follow the guide to benchmarking presented in class, in particular
-\item very readable, attractive plots (do 1 column, not 2 column plots
-for this class), proper readable font size. An example is below (of course you can have a different style),
-\item every plot answers a question, which you pose and extract the
-answer from the plot in its discussion
-\end{itemize}
-Every plot should be discussed (what does it show, which statements do
-you extract).
+\item naive: the naive implementation in SSA form
+\item vector sse: implemented 3D-vector math in sse instructions
+\item parallel sse 1: parallel processing of four particles without unrolling particles batches
+\item parallel sse 8: parallel processing of four particles with 8-fold particle batches unrolled
+\item jit scalar: the naive implementation as produced by the jit compiler by emitting scalar operations only
+\item jit sse: vectorized code form the jit compiler using 128bit vector register, i.e processing 4 particles in parallel
+\item jit avx: vectorized code from the jit compiler using the new 256bit register introduced with intel AVX extensions 
+\end{itemize} 
+
+\begin{figure}\centering
+  \includegraphics[scale=0.6]{single_dual_rules.pdf}
+  \caption{Performance comparison for single or dual rule scenarios
+  \label{perf_single}}
+\end{figure}
+
+Looking at figure \ref{perf_single} we can see that both our jit compiled and hand optimized code outperform the naive implementation to a varying degree. Due to required data shuffling neither can fully realize the theoretical speed up from vector instructions. In general we see the jit compiled code to be at least equally fast the conventional code. Also note that going from 4-way to 8-way vector instructions does not yield significant speed ups and in some cases even shows slow downs. Once again we attribute this to the increased overhead of even more data shuffling required.   
+
+\begin{figure}\centering
+  \includegraphics[scale=0.6]{multi_rules.pdf}
+  \caption{Performance comparison for multi rule scenarios
+  \label{perf_multi}}
+\end{figure}
+
+Going to figure \ref{perf_multi} the results shift in favour of both optimization paths, with an advantage for out JIT compiler. For both the jit compiled and conventional code the presence of many rules and therefore operations allows to mask the required data shuffling we have seen in the previous comparison. Looking closely at the results we can see that the \texttt{jit avx} code always outperforms every other version, and the \texttt{jit sse} code outperfoming the equivalent hand optimized code, \texttt{parallel sse 1}, as well. Comparing the two conventionally optimized code versions \texttt{parallel sse 1} and \texttt{parallel sse 8} it is clear that the further loop unrolling done in the later is worth the effort, even if the instructions present in the multiple rules all but exhaust the instruction buffers on the cpu and such further unrolling does not provide obvious advantages.
+
+Given that the JIT compiler can take advantage of implicit assumptions and inherent knowledge about the particle system it is able to translate these advantages into consistently higher speed-ups than the conventional optimizations, although with varying net gains.   
+
+
+
