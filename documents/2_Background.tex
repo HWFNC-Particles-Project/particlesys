@@ -11,7 +11,7 @@ struct particle_t {
     float velocity[3];
     float charge;
 } particle;
-\end{lstlisting} 
+\end{lstlisting}
 
 This allows for 16 bytes aligned access to both the position and velocity vectors, as well as creating rules for diverse application, e.g. for physical or chemical simulations.
 
@@ -36,19 +36,19 @@ In the end the complete simulation follows three very simple steps:
 If now the environment changes between iterations one simple has to update the list of rules to adapt the simulation to these new circumstances and can go right back to the simulation.
 
 \mypar{DSL}
-In order to keep the complexity and amount of work necessary for processing the code for the simulation rules we decided to introduce a small domain specific language (DSL). This DSL provides the following features: array access, floats as data type, algebraic operators, and boolean operators, the syntax closely matching that of the C language. This limited feature set allows for an efficient parsing and implementation in our JIT compiler. 
+In order to keep the complexity and amount of work necessary for processing the code for the simulation rules we decided to introduce a small domain specific language (DSL). This DSL provides the following features: array access, floats as data type, algebraic operators, and boolean operators, the syntax closely matching that of the C language. This limited feature set allows for an efficient parsing and implementation in our JIT compiler.
 
 \mypar{JIT Compiler}
-The goal of our JIT compiler is to fuse multiple rules into one executable function, therefore exploiting possible optimizations across multiple rules which static optimized code cannot do in ahead of time compilations. 
+The goal of our JIT compiler is to fuse multiple rules into one executable function, therefore exploiting possible optimizations across multiple rules which static optimized code cannot do in ahead of time compilations. Due to the limited scope of the DSL a straight forward hand written single pass lexer and recursive descent parser is sufficient to translate the rules into their intermediate representation. For the intermediate representation static single assignment form (SSA) is used since it allows efficient implementation of the relevant optimization passes. Since the DSL does not contain flow control constructs the optimizer and code generator only ever deal with a single basic block which significantly reduces the analysis that is required to optimize the code. The last step of translating the SSA code to machine code is performed using a x86-64 instruction encoder (PLASM). The code generator assigns registers and stack spilling locations on the fly and emits VEX encoded instructions only. The VEX encoding allows the use of non destructive instructions which are very close to their SSA counterparts. To make the code actually executable it is wrapped in a function templated and written to memory which is then switched to executable state by means of a system call.
 
-MORE HERE
--> standard parser/lexing
--> processing/optimizations (dead code/ deduplication)
--> Outputting code
--> setting exec bit
+%~ MORE HERE
+%~ -> standard parser/lexing
+%~ -> processing/optimizations (dead code/ deduplication)
+%~ -> Outputting code
+%~ -> setting exec bit
 
 \mypar{Cost Analysis}
 While it is possible to determine the exact op-count for any given rule there is no global cost measure in the number of particles as the final op-count depends on the number and nature of the involved rules and is subject to changes as the rules change throughout the simulation. The op-count relative to the input size, in our case number of particles, is always constant, meaning $O(1)$, the neglected constant factor pushes our computation far into the compute bound region of theoretical performance for all except the smallest simulations including only very few rules. Furthermore our simulation exhibits perfect spatial locality as it passes over the particles linearly.
-Given that our JIT compiler changes the number of stores, loads, and operations required for applying the rules, it is not possible to simply compare the flops/cycle between our jited code and optimized traditional code. The reason simply being that code with lower operational intensity but requiring fewer operations may still be faster than code requiring more operations and achieving higher operational intensity. 
+Given that our JIT compiler changes the number of stores, loads, and operations required for applying the rules, it is not possible to simply compare the flops/cycle between our jited code and optimized traditional code. The reason simply being that code with lower operational intensity but requiring fewer operations may still be faster than code requiring more operations and achieving higher operational intensity.
 
-We have therefore decided to look at the runtime, more precisely at the cycles per particle. This allows for a precise comparison how our jited code performs in comparison to the conventional code in an absolute way. 
+We have therefore decided to look at the runtime, more precisely at the cycles per particle. This allows for a precise comparison how our jited code performs in comparison to the conventional code in an absolute way.
