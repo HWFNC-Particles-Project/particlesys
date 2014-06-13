@@ -44,11 +44,12 @@ If the environment changes between iterations one has to update the list of rule
 The simulation can then proceed immediately afterwards.
 
 \mypar{DSL}
-To conveniently define the rules for the JIT compiler we introduced a domain specific language (DSL). The DSL provides a subset of C operator syntax including arithmetic, bitwise and ternary operators, termporary float variables and array access. This feature set allows for efficient parsing and implementation in our JIT compiler.
+To conveniently define the rules for the JIT compiler we introduced a domain specific language (DSL). The DSL provides a subset of C operator syntax including arithmetic, bitwise and ternary operators, temporary float variables and array access on the input arrays. This feature set is sufficiently expressive for the intended purposes while still being easy and fast to parse.
 
 \mypar{JIT Compiler}
-In contrast to the statically optimized code, the JIT compiler exploits possible optimizations across multiple rules by fusing all the rules into one executable function. %The goal of our JIT compiler is to fuse multiple rules into one executable function, therefore exploiting possible optimizations across multiple rules which static optimized code cannot do in ahead of time compilations. 
-To translate the DSL into the intermediate representation, a straight forward hand written single pass lexer and recursive descent parser was written. %Due to the limited scope of the DSL a straight forward hand written single pass lexer and recursive descent parser is sufficient to translate the rules into their intermediate representation. 
+In contrast to the static optimized code, the JIT compiler exploits possible optimisations across multiple rules by fusing all the rules into one executable function. %The goal of our JIT compiler is to fuse multiple rules into one executable function, therefore exploiting possible optimizations across multiple rules which static optimized code cannot do in ahead of time compilations.
+To translate the DSL into their intermediate representation, a straight forward hand written single pass lexer and recursive descent parser was written. %Due to the limited scope of the DSL a straight forward hand written single pass lexer and recursive descent parser is sufficient to translate the rules into their intermediate representation.
+
 For the intermediate representation a static single assignment form representation (SSA-IR)\cite[Chapter~6.2.4]{dragon}\cite{LuaJITir} is used since it allows efficient implementation of the relevant optimization passes. Because the DSL does not contain flow control constructs, the optimizer and code generator only ever deal with a single basic block. This significantly reduces the analysis that is required to optimize the code as compared to a general purpose compiler. The last step of translating the SSA-IR to machine code is performed using a x86-64 instruction encoder (PLASM). The code generator assigns registers and stack spilling locations on the fly and emits VEX encoded instructions only. The VEX encoding allows the use of non destructive instructions which are very close to their SSA-IR counterparts. To make the code actually executable it is wrapped in a function template and written to memory, which is then switched to executable state by means of a system call.
 
 %~ MORE HERE
@@ -60,8 +61,8 @@ For the intermediate representation a static single assignment form representati
 \mypar{Cost Analysis}
 While it is possible to determine the exact op-count for any given rule, the final op-count depends on the number and nature of the involved rules and can change throughout the simulation.
 Therefore there is no global cost measure.
-The op-count relative to the input size, in our case number of particles, is always $O(1)$. 
-For all except the smallest simulations including only very few rules, the neglected constant factor pushes our computation far into the compute bound region. 
+The op-count relative to the input size, in our case number of particles, is always $O(1)$.
+For all except the smallest simulations including only very few rules, the neglected constant factor pushes our computation far into the compute bound region.
 Furthermore our simulation exhibits perfect spatial locality as it passes over the particles linearly.
 Given that our JIT compiler changes the number of stores, loads, and operations required for applying the rules, it is not possible to simply compare the performance in flops/cycle between our jited code and static optimized code.
 The reason simply being that code with a lower performance but requiring fewer operations may still be faster than code requiring more operations and achieving higher operational intensity.
