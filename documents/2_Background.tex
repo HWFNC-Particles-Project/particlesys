@@ -43,7 +43,7 @@ If the environment changes between iterations one has to update the list of rule
 The simulation can then proceed immediately afterwards.
 
 \mypar{DSL}
-To conveniently define the rules for the JIT compiler we introduced a domain specific language (DSL). The DSL provides a subset of C operator syntax including arithmetic, bitwise and ternary operators, termporary float variables and array access on the input arrays. This feature set is sufficiently expressive for the intended purposes while still being easy and fast to parse.
+To conveniently define the rules for the JIT compiler we introduced a domain specific language (DSL). The DSL provides a subset of C operator syntax including arithmetic, bitwise and ternary operators, temporary float variables and array access on the input arrays. This feature set is sufficiently expressive for the intended purposes while still being easy and fast to parse.
 
 \mypar{JIT Compiler}
 In contrast to the static optimized code, the JIT compiler exploits possible optimisations across multiple rules by fusing all the rules into one executable function. %The goal of our JIT compiler is to fuse multiple rules into one executable function, therefore exploiting possible optimizations across multiple rules which static optimized code cannot do in ahead of time compilations.
