@@ -43,16 +43,6 @@ static struct {
         "diffy = [1]-y\n"
         "diffz = [2]-z\n"
         "r = 1.0/sqrt(diffx*diffx + diffy*diffy + diffz*diffz)\n"
-
-        //~ "r0 = diffx*diffx + diffy*diffy + diffz*diffz\n"
-        //~ "r1 = rsqrt(r0)\n"
-        //~ "r = (0.5)*r1*(3-r0*r1*r1)\n"
-        //~ "r3 = r*r*r\n"
-
-        //~ "r0 = sqrt(diffx*diffx + diffy*diffy + diffz*diffz)\n"
-        //~ "r1 = rcp(r0)\n"
-        //~ "r = 2*r1-r0*r1*r1\n"
-
         "r3 = r*r*r\n"
         "[4] = [4] + dt*mu*diffx*r3\n"
         "[5] = [5] + dt*mu*diffy*r3\n"
@@ -69,7 +59,6 @@ static struct {
         "dist = normalx*[0] + normaly*[1] + normalz*[2]\n"
         "vn = normalx*[4] + normaly*[5] + normalz*[6]\n"
         "mask = dist<d & vn<0\n"
-
         "dv = mask & vn\n"
         "factor = mask ? a:1\n"
         "[4] = ([4]-2*normalx*dv)*factor\n"
@@ -103,9 +92,9 @@ static struct {
         "mask = dist<r & vn<0\n"
         "dv = mask & vn\n"
         "factor = mask ? a:1\n"
-        "[4] = ([4]-2*normalx*dv)*factor\n"
-        "[5] = ([5]-2*normaly*dv)*factor\n"
-        "[6] = ([6]-2*normalz*dv)*factor\n"
+        "[4] = ([4]-2*dv*normalx)*factor\n"
+        "[5] = ([5]-2*dv*normaly)*factor\n"
+        "[6] = ([6]-2*dv*normalz)*factor\n"
         "offset = mask & (r-dist)\n"
         "[0] = [0] + normalx*offset\n"
         "[1] = [1] + normaly*offset\n"
@@ -120,40 +109,7 @@ static struct {
         },
 
     [EFFECT_TYPE_GRAVITY_FORCE]     = {0, 2, ""},
-    [EFFECT_TYPE_SPHERE_COLLISION]  = {3, 2,
-        "dt = [16]\n"
-        "r = [17]\n"
-        "a = [18]\n"
-        "x0 = [0]\n"
-        "y0 = [1]\n"
-        "z0 = [2]\n"
-        "x1 = [8]\n"
-        "y1 = [9]\n"
-        "z1 = [10]\n"
-
-
-        "[4] = (x1-x0)*dt\n"
-        "[5] = (y1-y0)*dt\n"
-        "[6] = (z1-z0)*dt\n"
-
-
-        /*
-        "diffx = x1-x0\n"
-        "diffy = y1-y0\n"
-        "diffz = z1-z0\n"
-        "dot = diffx*diffx + diffy*diffy + diffz*diffz\n"
-        "dist = sqrt(dot)\n"
-        "normalx = diffx*(1.0/dist)\n"
-        "normaly = diffy*(1.0/dist)\n"
-        "normalz = diffz*(1.0/dist)\n"
-        "[4] = [4] + normalx\n"
-        "[5] = [5] + normaly\n"
-        "[6] = [6] + normalz\n"
-        "[12] = [12] - normalx\n"
-        "[13] = [13] - normaly\n"
-        "[14] = [14] - normalz\n"
-        */
-        },
+    [EFFECT_TYPE_SPHERE_COLLISION]  = {3, 2, ""},
 };
 
 typedef struct effect_jit_t {
@@ -228,8 +184,8 @@ void count_ops(ssa_block *block, performance_count *pc) {
             case SSA_DIV: pc->div++; break;
             case SSA_SUB: pc->add++; break;
             case SSA_SQRT: pc->sqrt++; break;
-            case SSA_RSQRT: break;
-            case SSA_RCP: break;
+            case SSA_RSQRT: pc->rsqrt++; break;
+            case SSA_RCP: pc->rcp++; break;
             case SSA_BLEND: break;
             case SSA_CMPEQ: pc->cmp++; break;
             case SSA_CMPLT: pc->cmp++; break;
@@ -277,7 +233,6 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
         ssa_block_append(&block, &program->effects[el->type].block, input_remap);
     }
 
-
     uint64_t t0 = nanotime();
     if(program->level >= JIT_O1) {
         ssa_fuse_load_store(&block);
@@ -309,7 +264,6 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
             case JIT_AVX4: latency_estimate = ssa_schedule(&block, ivybridge4); break;
             default:       latency_estimate = ssa_schedule(&block, ivybridge1); break;
         }
-        printf("estimated_latency: %d\n", latency_estimate);
     }
     uint64_t t6 = nanotime();
 
@@ -323,17 +277,14 @@ void effect_program_jit_compile(effect_program *self, const effect_desc *desc) {
     }
     uint64_t t7 = nanotime();
 
-
-/*
-    fprintf(stderr, "fuse:      %f\n", (t1-t0)*1.0e-6);
-    fprintf(stderr, "fold:      %f\n", (t2-t1)*1.0e-6);
-    fprintf(stderr, "dedup:     %f\n", (t3-t2)*1.0e-6);
-    fprintf(stderr, "mark:      %f\n", (t4-t3)*1.0e-6);
-    fprintf(stderr, "resolve:   %f\n", (t5-t4)*1.0e-6);
-    fprintf(stderr, "schedule:  %f\n", (t6-t5)*1.0e-6);
-    fprintf(stderr, "generate:  %f\n", (t7-t6)*1.0e-6);
-    fprintf(stderr, "total:     %f\n\n", (t7-t0)*1.0e-6);
-*/
+    //~ fprintf(stderr, "fuse:      %f\n", (t1-t0)*1.0e-6);
+    //~ fprintf(stderr, "fold:      %f\n", (t2-t1)*1.0e-6);
+    //~ fprintf(stderr, "dedup:     %f\n", (t3-t2)*1.0e-6);
+    //~ fprintf(stderr, "mark:      %f\n", (t4-t3)*1.0e-6);
+    //~ fprintf(stderr, "resolve:   %f\n", (t5-t4)*1.0e-6);
+    //~ fprintf(stderr, "schedule:  %f\n", (t6-t5)*1.0e-6);
+    //~ fprintf(stderr, "generate:  %f\n", (t7-t6)*1.0e-6);
+    //~ fprintf(stderr, "total:     %f\n\n", (t7-t0)*1.0e-6);
 
     //~ dump_code(program->fun);
     ssa_block_destroy(&block);
