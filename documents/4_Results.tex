@@ -5,7 +5,7 @@ In this section we briefly describe our experimental setup, then provide some pe
 All measurements were performed on a Intel Core i7-3632QM (Ivy Bridge) processor running at a clock frequency of 3.2 GHz with cache sizes of 32kB (L1 data), 256kB (L2) and 6MB (L3). The clang compiler version 3.5 was used for all measurements with optimization flags: \texttt{-O3 -march=native}.
 
 For the particle system itself we have seen a nearly non-existing influence from the number of particles. When going from a small particle set that fits into the first level cache to a multi GB set the effect on the overall runtime is around one or two additional cpu cycles per particle and therefore can simply be ignored for any practical purpose. This behaviour is explained due to the perfect sequential traversal over the particles and the high enough computational intensity.
-This provides a perfect data access pattern for the hardware prefetcher, masking the memory accesses.
+This provides a perfect data access pattern for the hardware prefetcher to mask the memory accesses.
 %~ Specify the platform (processor, frequency, cache sizes)
 %~ as well as the compiler, version, and flags used. I strongly recommend that you play with optimization flags and consider also icc for additional potential speedup.
 
@@ -16,11 +16,11 @@ This provides a perfect data access pattern for the hardware prefetcher, masking
   \caption{Performance of the JIT compiler itself
   \label{perf_jit}}
 \end{figure}
-First we consider the performance of the JIT compiler itself. While compilation speed was not our primary concern, we still have to make sure it is suited for real time usage. Meaning we want compilation times to be at least in the low milisecond range. For reference, the time budget to calculate a single update cycle in real time graphics tasks is typically 8-30 miliseconds.
+First we consider the performance of the JIT compiler itself. While compilation speed was not our primary concern, we still have to make sure it is suited for real time usage. Meaning we want compilation times to be at most in the low milisecond range. For reference, the time budget to calculate a single update cycle in real time graphics tasks is typically 8-30 miliseconds.
 
 If we take a look at where the jit compiler spends its time (fig~\ref{perf_jit}) we immediately see that all except two stages run in the range of a few microseconds and only the scheduling and code generation take significantly more time. \\
 The code generation runs in approximately constant time, around 40 to 120 microseconds, where most of the time is used for two system-calls. These two calls, \texttt{mmap} and \texttt{mprotect}, cause page faults and context switches within the operating system and therefore impose a constant cost that is hard to avoid. The actual writing of the code is only a minor part of the generation stage. \\
-Turning our attention to the scheduling stage, we immediately see that the time used for the scheduling steps is strongly dependant on the number of rules, and by extension the number of instructions that are composed together. 
+Turning our attention to the scheduling stage, we immediately see that the time used for the scheduling step is strongly dependant on the number of rules, and by extension the number of instructions that are composed together. 
 For scenarios with a few rules, the scheduling is eclipsed by the code generation, but for more complex scenarios scheduling takes more time.
 Still, the whole JIT compiler runs in the sub-millisecond range for reasonable use cases and is therefore fast enough for real time usage.
 
@@ -30,10 +30,10 @@ When looking at the performance of the code itself, we distinguish two situation
 \item[naive:] the naive implementation in SSA form
 \item[vector SSE:] implemented 3D-vector math in SSE instructions
 \item[parallel SSE 1:] parallel processing of four particles without loop unrolling
-\item[parallel SSE 8:] parallel processing of four particles with 8-fold loop unrolling
+\item[parallel SSE 8:] parallel processing of four particles with further 8-fold loop unrolling
 \item[JIT scalar:] the naive implementation as produced by the JIT compiler by emitting scalar operations only
-\item[JIT SSE:] vectorized code form the JIT compiler using 128bit vector register, i.e processing 4 particles in parallel
-\item[JIT AVX:] vectorized code from the JIT compiler using the new 256bit register introduced with intel AVX extensions
+\item[JIT AVX 4:] vectorized code form the JIT compiler using 128bit vector register, i.e processing 4 particles in parallel
+\item[JIT AVX 8:] vectorized code from the JIT compiler using the extended 256bit register, i.e processing 8 particles in parallel
 \end{description}
 
 \begin{figure}[th]\centering
@@ -50,9 +50,9 @@ Looking at figure~\ref{perf_single} we can see that both our JIT compiled and ha
   \label{perf_multi}}
 \end{figure}
 
-The test cases shown in figure~\ref{perf_multi} use more rules at once and we see the results shift in favour of both optimization paths, with an advantage for the JIT compiler. For both the JIT compiled and conventional code the presence of many rules and therefore many operations allows to compensate the data shuffling overhead we have seen in the previous comparison. Looking closely at the results we can see that the \texttt{jit avx} code always outperforms every other version, and the \texttt{jit sse} code outperfoming the equivalent hand optimized code, \texttt{parallel sse 1}, as well. Comparing the two conventionally optimized code versions \texttt{parallel sse 1} and \texttt{parallel sse 8} indicates that loop unrolling still increases instruction level parallelism, since the version without loop unrolling is still latency limited.
+The test cases shown in figure~\ref{perf_multi} use more rules at once and we see the results shift in favour of both optimization paths, with an advantage for the JIT compiler. For both the JIT compiled and conventional code the presence of many rules and therefore many operations allows to compensate the data shuffling overhead we have seen in the previous comparison. Looking closely at the results we can see that the \texttt{jit avx 8} code always outperforms every other version, and the \texttt{jit avx 4} code outperfoming the equivalent hand optimized code, \texttt{parallel sse 1}, as well. Comparing the two conventionally optimized code versions \texttt{parallel sse 1} and \texttt{parallel sse 8} indicates that loop unrolling further increases instruction level parallelism, since the version without loop unrolling is still latency limited.
 
-One of the main advantages of the JIT compiler is that it significantly reduces the amount of actually generated instructions. The optimization passes eliminate up to half of the instructions present in the input rules. Due to the types of optimizations that are performed it does however not reduce the critical path length. So the total latency of one loop iteration is unaffected when assuming perfect instruction level paralellism. This reinforces the observation that loop unrolling could provide a speed up for the JIT compiled code by allowing more efficient interleaving of independent paths of execution.
+One of the main advantages of the JIT compiler is that it significantly reduces the amount of actually generated instructions. The optimization passes eliminate up to half of the instructions present in the input rules. Due to the types of optimizations that are performed it does however not reduce the critical path length. So the total latency of one loop iteration is unaffected when assuming perfect instruction level paralellism. This reinforces the observation that loop unrolling could provide a further speed up for the JIT compiled code by allowing more efficient interleaving of independent paths of execution.
 
 
 
