@@ -1,20 +1,19 @@
 \section{Introduction}\label{sec:intro}
 
 Traditionally environmental animations for games and movies were done procedurally or by hand. 
-With the ongoing desire to produce realistic and detailed environments, these animations are becoming too numerous and complex.
-It becomes thus too costly to be done procedurally or by hand. 
-The steady increase in available compute power in the last few years made it possible to replace these time and cost intensive task will small simulations that produce physically convincing results while still providing a degree of influence to the creator.
+With the ongoing desire to produce more realistic and detailed environments, these animations are becoming too numerous and complex.
+Thus they become too costly to be done procedurally or by hand. 
+The steady increase in available compute power in the last few years made it possible to replace these time and cost intensive task with small simulations that produce physically convincing results while still providing a degree of influence to the creator.
 
 \mypar{Motivation}
 In the light of these requirements and circumstances we decided to look at rule based particle simulations.
-A given set of rules are applied to the particles in each time-step.
+A given set of rules is applied to the particles in each time-step.
 These simulations are especially interesting as they allow to model a wide range of environments depending on the set of rules governing a given scenario. 
-As the number and composition of such rules is arbitrarily large and can dynamically change over the course of the simulation, it is hard to produce optimized code for such a simulation. We have therefore decided to explore the possibility of creating a just-in-time compiler (JIT) specialized for such particle simulations.
+As the number and composition of such rules is arbitrarily large and can dynamically change over the course of the simulation, it is hard to produce optimized code for such a simulation. We have therefore decided to explore the possibility of creating a Just-In-Time compiler (JIT) specialized for such particle simulations.
 
-Limiting the scope of the compiler input to a well defined and small problem allows our JIT compiler to incorporate a lot of domain specific knowledge and optimizations directly into its inner workings. For example, our JIT compiler knows the data layout for the particles and does not have to support any number of possible containers or data formats.
+Limiting the scope of the compiler input to a well defined and limited problem allows our JIT compiler to incorporate a lot of domain specific knowledge and optimizations directly into its inner workings. For example, our JIT compiler knows the data layout for the particles and does not have to support any number of possible container or data formats.
 
 \mypar{Related work}
-JIT compilers are located somewhere between traditional ahead-of-time compilers (AOT) such as clang\cite{clang}, gcc\cite{gcc} or icc\cite{icc} and interpreters for scripting languages such as JavaScript. As such they often include techniques from both end of this spectrum. The core idea is that code is only translated to machine instructions at the latest possible time. This makes JIT compilers well suited for dynamic languages such as JavaScript or Lua as well as situations in which information about the target architecture is either not available beforehand or can be used to increase performance (??by using architecture specific features??). JIT compilers are widely used, most notably in the form of the Java Virtual Machine\cite{jvm} and the JavaScript\cite{v8}\cite{SpiderMonkey} engines found in web browsers. Another state of the art JIT compiler from which we took some inspiration for the internal code represenation is LuaJIT \cite{LuaJIT}\cite{LuaJITir}, a JIT compiler for the Lua language. Other uses of JIT compilers that resemble our use case are found in graphics card drivers to translate generic shader code (OpenGL) and compute kernels (OpenCL) to highly optimized hardware specific machine code.
-
+JIT compilers are located somewhere between traditional Ahead-Of-Time compilers (AOT) such as clang\cite{clang}, gcc\cite{gcc} or icc\cite{icc} and interpreters for scripting languages such as JavaScript. As such they often include techniques from both end of this spectrum. The core idea is that code is only translated to machine instructions at the latest possible time. This makes JIT compilers well suited for dynamic languages such as JavaScript or Lua as well as situations in which information about the target architecture is either not available beforehand or can be used to increase performance. JIT compilers are widely used, most notably in the form of the Java Virtual Machine\cite{jvm} and the JavaScript\cite{v8}\cite{SpiderMonkey} engines found in web browsers. Another state of the art JIT compiler from which we took some inspiration for the internal code represenation is LuaJIT \cite{LuaJIT}\cite{LuaJITir}, a JIT compiler for the Lua language. Other uses of JIT compilers that resemble our use case are found in graphics card drivers to translate generic shader code (OpenGL) and compute kernels (OpenCL) to highly optimized hardware specific machine code.
 
 %~ As for particle systems they have been studied in great details and been in use for a long time $>-$citation needed$<-$ and there exist optimizations and implementations for any number of simulation settings.
