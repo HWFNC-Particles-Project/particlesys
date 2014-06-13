@@ -5,20 +5,22 @@ In this section be briefly describe our experimental setup, then provide some pe
 \mypar{Experimental setup}
 
 All measurements were performed on a Intel Core i7-3632QM (Ivy Bridge) processor running a clock frequency of 3.2 GHz with cache sizes of 32kB (L1 data), 256kB (L2) and 6MB (L3). The clang compiler version 3.5 was used for all measurements with optimization flags: \texttt{-O3 -march=native}.
+
+For the particle system itself we have seen a nearly non-existing influence from the number of particles. When going from a small particle set that fits into the first level cache to a multi GB set the effect on the overall runtime is around one or two additional cpu cycles per particle and therefore can simply be ignored for any practical purpose. This behaviour is mostly possible due to the perfect sequential traversal over the particles, the therefore perfect data access pattern for the hardware prefetcher, and the high enough computational load for most scenarios masking the memory accesses.
 %~ Specify the platform (processor, frequency, cache sizes)
 %~ as well as the compiler, version, and flags used. I strongly recommend that you play with optimization flags and consider also icc for additional potential speedup.
 
 
 \mypar{JIT Compiler}
 
-\begin{figure}\centering
-  \includegraphics[scale=0.6]{single_dual_rules.pdf}
+\begin{figure}[t]\centering
+  \includegraphics[width=0.5\textwidth]{jit_perf.pdf}
   \caption{Performance of the JIT compiler itself
   \label{perf_jit}}
 \end{figure}
 
-First we consider the performance of the JIT compiler itself. While compilation speed was not our primary concern we still have to make sure it is suited for real time usage. Meaning we want compilation times to be at least be in the low milisecond range. For reference, the time budget to calculate a single update cycle in real time graphics tasks is typically 8-30 milisecond.
-If we take a look at where the jit compiler spends its time [\ref{perf_jit}] we immediately see that all except two stages run in the range of a few microseconds and only the scheduling and code generation take significantly more time. The code generation runs in approximately constant time, around 40 to 120 microseconds, where most of the time is used for two system-calls. These two calls, \texttt{mmap} and \texttt{mprotect}, cause page faults and context switches within the operating system and therefore impose a constant cost that is hard to avoid. The actual writing of the code is only a minor part of the generation stage. Turning our attention to the scheduling stage we immediately see that the time used for the scheduling steps is strongly dependant on the number of rules, and by extension the number of instructions within them, that are composed together. For only a few rules the scheduling is still eclipsed by the code generation, for any at least mildly complex scenario though the scheduling does take a longer time to complete its work. Still the whole JIT compiler runs in the sub-millisecond range for reasonable uses cases and is therefore fast enough for real time usage.
+First we consider the performance of the JIT compiler itself. While compilation speed was not our primary concern we still have to make sure it is suited for real time usage. Meaning we want compilation times to be at least in the low milisecond range. For reference, the time budget to calculate a single update cycle in real time graphics tasks is typically 8-30 milisecond.
+If we take a look at where the jit compiler spends its time [\ref{perf_jit}] we immediately see that all except two stages run in the range of a few microseconds and only the scheduling and code generation take significantly more time. The code generation runs in approximately constant time, around 40 to 120 microseconds, where most of the time is used for two system-calls. These two calls, \texttt{mmap} and \texttt{mprotect}, cause page faults and context switches within the operating system and therefore impose a constant cost that is hard to avoid. The actual writing of the code is only a minor part of the generation stage. Turning our attention to the scheduling stage we immediately see that the time used for the scheduling steps is strongly dependant on the number of rules, and by extension the number of instructions within them, that are composed together. For only a few rules the scheduling is still eclipsed by the code generation, for any at least mildly complex scenario though the scheduling does take a longer time to complete its work. Still the whole JIT compiler runs in the sub-millisecond range for reasonable use cases and is therefore fast enough for real time usage.
 
 \mypar{Code Perfomance}
 
@@ -33,7 +35,7 @@ When looking at the performance of the code itself we distinguish two situations
 \item jit avx: vectorized code from the jit compiler using the new 256bit register introduced with intel AVX extensions
 \end{itemize}
 
-\begin{figure}\centering
+\begin{figure}[th]\centering
   \includegraphics[scale=0.6]{single_dual_rules.pdf}
   \caption{Performance comparison for single or dual rule scenarios
   \label{perf_single}}
@@ -41,7 +43,7 @@ When looking at the performance of the code itself we distinguish two situations
 
 Looking at figure \ref{perf_single} we can see that both our jit compiled and hand optimized code outperform the naive implementation to varying degrees. Due to required data shuffling neither can fully realize the theoretical speed up from vector instructions. In general we see the jit compiled code to be at least equally as fast as the conventional code. Also note that going from 4-way to 8-way vector instructions does not yield significant speed ups and in some cases even results in slow downs. This may be in part caused by added data shuffling. Some instructions (\texttt{sqrtps} and \texttt{divps} specifically) also have twice the latency and half the throughput in their 256bit versions on the used processor. Therefore they do not provide an actual advantage over their 128bit counterparts. The test cases called \emph{central4} and \emph{central8} in figure \ref{perf_multi} are strongly affected by this since their running time is dominated by those two instructions.
 
-\begin{figure}\centering
+\begin{figure}[th]\centering
   \includegraphics[scale=0.6]{multi_rules.pdf}
   \caption{Performance comparison for multi rule scenarios
   \label{perf_multi}}
