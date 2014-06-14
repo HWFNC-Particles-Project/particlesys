@@ -304,7 +304,7 @@ void test_performance_effect(effect_program *test_program, const effect_desc *ef
     effect_program_perf_c(test_program, &arr, dt, perf);
 
     //double freq = 1.8e9;
-    double freq = 3.4e9;
+    double freq = 3.05e9;
     size_t cost = 75 * particle_array_size(initial_arr) + 
                   perf->add * 3 + perf->mul * 5 + perf->div * 11 + perf->rcp * 7 + perf->cmp * 3 + perf->sqrt * 16 + perf->loads * 4 + perf->stores * 4;
     size_t repeats = 10 * freq / cost;
